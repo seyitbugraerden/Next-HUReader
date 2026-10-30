@@ -36,6 +36,7 @@ export async function decodeImage(
       limitInputPixels: limit || false,
       animated: false,
     })
+      .autoOrient()
       .flatten({ background: '#000000' })
       .greyscale()
       .raw()

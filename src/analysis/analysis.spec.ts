@@ -54,6 +54,27 @@ describe('Numerical analysis', () => {
     expect(r.measurements[0]!.mean).toBe(1000);
     expect(r.measurements[0]!.area).toBeCloseTo(13 * 0.06);
   });
+  it('uses the same EXIF orientation as the browser for manual JPEG coordinates', async () => {
+    const pixels = Buffer.alloc(200 * 100 * 3);
+    for (let y = 0; y < 100; y++)
+      for (let x = 0; x < 200; x++)
+        for (let c = 0; c < 3; c++)
+          pixels[(y * 200 + x) * 3 + c] = x < 100 ? 50 : 200;
+    const jpeg = await sharp(pixels, {
+      raw: { width: 200, height: 100, channels: 3 },
+    })
+      .jpeg({ quality: 100 })
+      .withMetadata({ orientation: 6 })
+      .toBuffer();
+    const r = await service.analyze(jpeg, 'rotated.jpg', {
+      centerX: 50,
+      centerY: 150,
+      radius: 20,
+      insetPixels: 0,
+    });
+    expect([r.width, r.height]).toEqual([100, 200]);
+    expect(r.measurements[0]!.mean).toBeCloseTo(200, 0);
+  });
   it('fits a synthetic off-center disk and excludes a lower support', async () => {
     const width = 200,
       height = 200,
@@ -70,6 +91,32 @@ describe('Numerical analysis', () => {
     expect(r.roi.y).toBeCloseTo(95, 0);
     expect(Math.abs(r.roi.radius - 57)).toBeLessThan(2);
   });
+  it.each(['uniform', 'rectangle'])(
+    'does not invent a circular sample on a %s image',
+    async (kind) => {
+      const width = 200,
+        height = 200,
+        pixels = Buffer.alloc(width * height);
+      for (let y = 0; y < height; y++)
+        for (let x = 0; x < width; x++)
+          if (kind === 'uniform' || (x > 40 && x < 160 && y > 30 && y < 175))
+            pixels[y * width + x] = 180;
+      const image = await sharp(pixels, { raw: { width, height, channels: 1 } })
+        .png()
+        .toBuffer();
+      await expect(service.analyze(image, `${kind}.png`, {})).rejects.toThrow(
+        'Dairesel numune',
+      );
+      // Manual ROI remains possible on a deliberately selected region.
+      const manualResult = await service.analyze(image, `${kind}.png`, {
+        centerX: 100,
+        centerY: 100,
+        radius: 20,
+        insetPixels: 0,
+      });
+      expect(manualResult.measurements[0]!.mean).toBe(180);
+    },
+  );
   it('rejects an invalid ROI, empty input, and unsupported images', async () => {
     await expect(
       service.analyze(await grayImage(), 'x.png', { ...manual, radius: 20 }),

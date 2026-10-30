@@ -26,12 +26,12 @@ npm run start:prod
 
 1. **Görüntü yükle:** Bir veya birden fazla PNG, JPG veya tek kesitli CT DICOM seçin. **Klasör seç** düğmesiyle bir klasörü alt klasörleriyle birlikte de ekleyebilirsiniz. Yeni seçimler dosya kuyruğuna eklenir; dosyaları listeden ayrı ayrı kaldırabilirsiniz. **Ölçüm ayarlarına geç** ile ikinci aşamayı açın.
 2. **Ölçüm alanını incele:** Dosya seçicisinden incelemek istediğiniz kesiti seçin. Gerekirse piksel boyutunu, kenar payını ve çemberi ayarlayın. **Ölçümü hesapla** yalnızca seçili dosyayı, **Tüm dosyaları analiz et** güncel sonucu olmayan dosyaları sırayla işler. Her dosya kendi ayarlarını korur; bir dosya hata verdiğinde sıradaki dosyaya geçilir.
-3. Kesikli turuncu numune sınırını ve yeşil ölçüm alanını kontrol edin. Otomatik seçim bir öneridir. Elle seçimle X/Y merkezi ve yarıçapı değiştirin; görüntüye tıklayarak merkezi taşıyabilirsiniz. Değişikliklerden sonra yeniden hesaplayın.
+3. Kesikli turuncu numune sınırını ve yeşil ölçüm alanını kontrol edin. Otomatik seçim bir öneridir; sınır noktaları çembere yeterince uymuyorsa elle seçim istenir. Elle seçimle X/Y merkezi ve yarıçapı değiştirin; görüntüye tıklayarak merkezi taşıyabilirsiniz. Değişikliklerden sonra yeniden hesaplayın.
 4. **Sonuçlara geç** ile üçüncü aşamayı açın. En az bir güncel başarılı ölçüm varsa bu aşama kullanılabilir. Üstte tüm dosyaların durumu ve karşılaştırma tablosu, altta seçilen başarılı dosyanın ayrıntıları görünür. **Excel raporunu indir** seçilen dosyanın dört sayfalı raporunu, **Toplu Excel indir** tüm güncel başarılı sonuçların altı sayfalı raporunu üretir.
 
 Üstteki sekmeler ve geri düğmeleriyle önceki aşamalara dönebilirsiniz. Aynı dosya için ayarlar korunur. Dosya seçilmeden ikinci, en az bir başarılı hesaplama yapılmadan üçüncü aşama açılmaz. Bir dosyanın ayarları değişirse o dosyanın eski ölçümü toplu tablodan ve Excel ölçümlerinden çıkarılır; diğer dosyaların güncel sonuçları korunur. Yeni eklenen dosyalar boş ayarlar ve otomatik alan seçimiyle başlar. Dosyalar sırayla, tek dosyalı analiz API’si üzerinden işlenir; istek başına tek dosya sınırı toplu dosya seçimini engellemez. Kuyruk ve sonuçlar yalnızca açık tarayıcı sekmesinde tutulur; sayfa yenilendiğinde temizlenir.
 
-Klasör seçiminde PNG/JPG, `.dcm`/`.dicom`/`.ima` dosyaları ve başlığında DICOM Part 10 imzası bulunan uzantısız/sayısal uzantılı dosyalar tanınır. Diğer biçimler ve gizli dosyalar atlanır; eklenen, atlanan ve zaten listede olan dosya sayıları gösterilir. Aynı göreli yol, boyut ve son değiştirme bilgisine sahip tekrar seçimler kuyruğa yeniden eklenmez. Dosyalar göreli yola göre doğal sırada listelenir. Alt klasörlerde aynı adı taşıyan dosyalar ayrı tutulur; yollar önizlemede, karşılaştırma tablosunda ve her iki Excel raporunda korunur.
+Klasör seçiminde PNG/JPG, `.dcm`/`.dicom`/`.ima` dosyaları ve başlığında DICOM Part 10 imzası bulunan uzantısız/sayısal uzantılı dosyalar tanınır. Diğer biçimler ve gizli dosyalar atlanır; eklenen, atlanan ve zaten listede olan dosya sayıları gösterilir. Aynı göreli yol, boyut ve son değiştirme bilgisine sahip dosyalarda içerik de SHA-256 ile karşılaştırılır; yalnızca içerik de aynıysa tekrar seçim kuyruğa eklenmez. Aynı metadata ile farklı içerikler ayrı tutulur. Okunamayan dosya klasörün kalanının eklenmesini durdurmaz. Dosyalar göreli yola göre doğal sırada listelenir. Alt klasörlerde aynı adı taşıyan dosyalar ayrı tutulur; yollar önizlemede, karşılaştırma tablosunda ve her iki Excel raporunda korunur.
 
 Klasör seçimi tarayıcının kullanıcı tarafından seçilen dosyalarına dayanır; sunucuya mutlak bir disk yolu verilmez. Seçim anlık bir taramadır, klasör izleme hizmeti değildir. Yeni dosyalar eklenince klasörü tekrar seçin. Klasör seçimini desteklemeyen tarayıcılarda çoklu dosya seçimi kullanılabilir. Tarayıcı özelliği: [MDN — webkitdirectory](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/webkitdirectory).
 
@@ -49,7 +49,7 @@ Sekmeler sol/sağ ok, Home ve End tuşlarıyla kullanılabilir. Önizlemedeki ta
 
 **DICOM:** Part 10 başlığı olan, tek kareli, tek kanallı, sıkıştırılmamış 8/16 bit CT desteklenir. Implicit VR Little Endian, Explicit VR Little Endian ve Explicit VR Big Endian kabul edilir. HU = ham piksel × RescaleSlope + RescaleIntercept. DICOM PixelSpacing ve PixelPadding bilgileri kullanılır; hasta kimlik bilgileri sonuçlara taşınmaz. Desteklenmeyen sıkıştırma, çok kare, LUT ve HU dışı birim durumları açık hata verir. RescaleType yoksa CT modalitesine dayanıldığı raporda belirtilir. Yalnızca tek, klasik CT kesiti desteklenir; Enhanced CT desteği yoktur.
 
-**PNG/JPG:** Siyah arka plan üzerine düzleştirilmiş, 8 bit gri ton yoğunluğu (0–255) analiz edilir. Bu değerler HU değildir. Bilinen pencere alt/üst sınırları birlikte girilirse doğrusal dönüşümle **yaklaşık HU** gösterilir. Pencere dönüşümünün doğrusal olduğu varsayılır; kayıplı sıkıştırma, gama/renk dönüşümleri, pencere uçlarında kırpılma, yeniden boyutlandırma ve görüntü üzerindeki işaretler nedeniyle özgün DICOM sonuçları elde edilemez. Tam sayısal analiz için işaretlenmemiş özgün DICOM gerekir.
+**PNG/JPG:** EXIF yön bilgisi uygulanarak önizlemeyle aynı koordinat yönünde işlenir. Siyah arka plan üzerine düzleştirilmiş, 8 bit gri ton yoğunluğu (0–255) analiz edilir. Bu değerler HU değildir. Bilinen pencere alt/üst sınırları birlikte girilirse doğrusal dönüşümle **yaklaşık HU** gösterilir. Pencere dönüşümünün doğrusal olduğu varsayılır; kayıplı sıkıştırma, gama/renk dönüşümleri, pencere uçlarında kırpılma, yeniden boyutlandırma ve görüntü üzerindeki işaretler nedeniyle özgün DICOM sonuçları elde edilemez. Tam sayısal analiz için işaretlenmemiş özgün DICOM gerekir.
 
 PNG/JPG piksel boyutu isteğe bağlı girilir. DICOM'da kullanıcı piksel boyutu ve pencere kalibrasyonu alanları kullanılmaz; dosyadaki değerler esastır. DICOM önizlemesi −1000 … +1000 HU aralığındadır, ölçümler bu görüntüleme aralığıyla kırpılmaz.
 
@@ -86,7 +86,12 @@ npm run build
 npm run lint
 npm test
 npm run test:e2e
+npm run test:workflow
 ```
+
+Tarayıcı testleri Google Chrome kullanır ve kendi sunucusunu 3100 portunda başlatıp kapatır. Chrome yerine Playwright Chromium kullanmak için önce `npx playwright install chromium`, sonra `PLAYWRIGHT_CHANNEL=chromium npm run test:workflow` çalıştırın. Test portu `WORKFLOW_TEST_PORT` ile değiştirilebilir. Hata ekranları ve izler, Git'e alınmayan `test-results/` dizininde tutulur. Test verileri sentetiktir; kullanıcının dosyaları kullanılmaz.
+
+[Akış denetimi ve bulunan hatalar](docs/flow-audit.md) dosyasında senaryolar, sayısal karşılaştırmalar ve doğrulamanın sınırları açıklanır.
 
 Testler bilinen sayısal istatistikleri, sentetik daire seçimini, gri ton / yaklaşık HU ayrımını, DICOM signed piksel dönüşümünü, padding dışlamasını, alan hesabını, geçersiz girdi hatalarını ve gerçek XLSX üretimini doğrular. HTTP testleri geçici yerel port açar.
 

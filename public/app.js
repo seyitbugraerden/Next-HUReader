@@ -7,6 +7,7 @@ let file = null;
 let result = null;
 let analyzedBody = null;
 let previewImage = null;
+let previewRevision = 0;
 let currentPreviewUrl = null;
 let busy = false;
 let currentStep = 1;
@@ -177,6 +178,7 @@ function selectEntry(id, save = true) {
     URL.revokeObjectURL(currentPreviewUrl);
     currentPreviewUrl = null;
   }
+  previewRevision++;
   previewImage = null;
   $('#image-canvas').hidden = true;
   $('#empty').hidden = false;
@@ -334,7 +336,7 @@ function dirty() {
   syncWorkflow();
   if (result) {
     $('#status').textContent =
-      'Ayarlar değişti. Sonuçlara geçmeden önce ölçümü yeniden hesaplayın.';
+      'Bu dosyanın ayarları değişti. Güncel rapora dahil etmek için yeniden hesaplayın.';
     $('#status').hidden = false;
     $('#export').disabled = true;
   }
@@ -382,6 +384,15 @@ async function supportedFile(file) {
       bytes[2] === 255)
   );
 }
+async function contentFingerprint(file) {
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    await file.arrayBuffer(),
+  );
+  return [...new Uint8Array(digest)]
+    .map((value) => value.toString(16).padStart(2, '0'))
+    .join('');
+}
 async function chooseFiles(selection, fromFolder = false) {
   if (busy || importing) return;
   importing = true;
@@ -400,62 +411,97 @@ async function chooseFiles(selection, fromFolder = false) {
   syncWorkflow();
   let added = 0,
     skipped = 0,
-    duplicates = 0;
-  const rejected = [];
-  const known = new Set(entries.map((entry) => entry.sourceKey));
-  let firstAdded = null;
+    duplicates = 0,
+    firstAdded = null;
+  const rejected = [],
+    unreadable = [];
+  const known = new Map();
+  for (const entry of entries) {
+    const candidates = known.get(entry.sourceKey) || [];
+    candidates.push(entry);
+    known.set(entry.sourceKey, candidates);
+  }
   try {
     for (const selected of files) {
       const relativePath = selected.webkitRelativePath || selected.name;
-      if (relativePath.split('/').some((part) => part.startsWith('.'))) {
-        skipped++;
-        continue;
+      try {
+        if (relativePath.split('/').some((part) => part.startsWith('.'))) {
+          skipped++;
+          continue;
+        }
+        if (!(await supportedFile(selected))) {
+          skipped++;
+          continue;
+        }
+        if (selected.size > 20 * 1024 * 1024) {
+          rejected.push(relativePath);
+          continue;
+        }
+        const sourceKey = `${fromFolder ? 'folder' : 'file'}:${relativePath}:${selected.size}:${selected.lastModified}`;
+        const candidates = known.get(sourceKey) || [];
+        let fingerprint = null,
+          duplicate = false;
+        if (candidates.length) {
+          fingerprint = await contentFingerprint(selected);
+          for (const candidate of candidates) {
+            try {
+              candidate.contentHash ??= await contentFingerprint(
+                candidate.file,
+              );
+            } catch {
+              continue;
+            }
+            if (candidate.contentHash === fingerprint) {
+              duplicate = true;
+              break;
+            }
+          }
+        }
+        if (duplicate) {
+          duplicates++;
+          continue;
+        }
+        const entry = {
+          id: crypto.randomUUID(),
+          file: selected,
+          relativePath,
+          sourceKey,
+          contentHash: fingerprint,
+          result: null,
+          dirty: true,
+          body: null,
+          error: null,
+          processing: false,
+          settings: { manual: false, estimate: false, values: {} },
+        };
+        entries.push(entry);
+        candidates.push(entry);
+        known.set(sourceKey, candidates);
+        firstAdded ??= entry.id;
+        added++;
+      } catch {
+        unreadable.push(relativePath);
       }
-      if (selected.size > 20 * 1024 * 1024) {
-        rejected.push(relativePath);
-        continue;
-      }
-      const sourceKey = `${fromFolder ? 'folder' : 'file'}:${relativePath}:${selected.size}:${selected.lastModified}`;
-      if (known.has(sourceKey)) {
-        duplicates++;
-        continue;
-      }
-      if (!(await supportedFile(selected))) {
-        skipped++;
-        continue;
-      }
-      const entry = {
-        id: crypto.randomUUID(),
-        file: selected,
-        relativePath,
-        sourceKey,
-        result: null,
-        dirty: true,
-        body: null,
-        error: null,
-        processing: false,
-        settings: { manual: false, estimate: false, values: {} },
-      };
-      entries.push(entry);
-      known.add(sourceKey);
-      firstAdded ??= entry.id;
-      added++;
     }
     if (!activeEntry() && firstAdded) selectEntry(firstAdded, false);
     const folderName = fromFolder
       ? files[0]?.webkitRelativePath.split('/')[0]
       : null;
     $('#import-summary').textContent =
-      `${folderName ? folderName + ' · ' : ''}${added} dosya eklendi${skipped ? ` · ${skipped} desteklenmeyen/gizli dosya atlandı` : ''}${duplicates ? ` · ${duplicates} dosya zaten listede` : ''}${rejected.length ? ` · ${rejected.length} dosya boyut sınırını aşıyor` : ''}.`;
+      `${folderName ? folderName + ' · ' : ''}${added} dosya eklendi${skipped ? ` · ${skipped} desteklenmeyen/gizli dosya atlandı` : ''}${duplicates ? ` · ${duplicates} dosya zaten listede` : ''}${rejected.length ? ` · ${rejected.length} dosya boyut sınırını aşıyor` : ''}${unreadable.length ? ` · ${unreadable.length} dosya okunamadı` : ''}.`;
     if (!files.length)
       $('#import-summary').textContent =
         'Klasörde okunabilir dosya bulunamadı.';
+    const problems = [];
     if (rejected.length)
-      showError(
+      problems.push(
         `Dosya başına 20 MB sınırını aşan dosyalar eklenmedi: ${rejected.join(', ')}`,
       );
-  } catch (error) {
-    showError(`Dosyalar okunurken bir hata oluştu: ${error.message}`);
+    if (unreadable.length)
+      problems.push(
+        `Okunamayan dosyalar atlandı, diğer dosyalar eklendi: ${unreadable.join(', ')}`,
+      );
+    if (problems.length) showError(problems.join(' '));
   } finally {
     importing = false;
     fileInput.value = '';
@@ -484,9 +530,11 @@ for (const name of ['dragleave', 'drop'])
     if (name === 'drop' && !busy) chooseFiles(event.dataTransfer.files);
   });
 function loadPreview(url) {
+  const revision = ++previewRevision;
+  const entryId = activeId;
   const image = new Image();
   image.onload = () => {
-    if (url !== currentPreviewUrl && url !== result?.preview) return;
+    if (revision !== previewRevision || entryId !== activeId) return;
     previewImage = image;
     $('#image-canvas').hidden = false;
     $('#empty').hidden = true;
@@ -624,7 +672,7 @@ form.addEventListener('submit', async (event) => {
     $('#status').hidden = true;
     if (result) {
       $('#status').textContent =
-        'Ölçüm tamamlanamadı. Ayarları kontrol edip tekrar hesaplayın; rapor adımı henüz kullanılamıyor.';
+        'Bu dosyanın ölçümü tamamlanamadı ve eski sonucu rapora alınmayacak. Diğer dosyaların güncel sonuçları korunur; ayarları düzeltip tekrar hesaplayın.';
       $('#status').hidden = false;
     }
   } finally {

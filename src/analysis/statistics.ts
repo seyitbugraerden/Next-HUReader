@@ -61,7 +61,14 @@ export function detectCircle(image: ImageData): Circle | null {
         last = x;
       }
     }
-    if (first >= 0 && last - first > w * 0.18 && last - first < w * 0.85) {
+    // The search-window edges are not object boundaries. A uniform image must
+    // never become a fabricated circular sample.
+    if (
+      first > Math.floor(w * 0.1) &&
+      last < Math.ceil(w * 0.9) - 1 &&
+      last - first > w * 0.18 &&
+      last - first < w * 0.85
+    ) {
       points.push([first, y], [last, y]);
     }
   }
@@ -124,5 +131,16 @@ export function detectCircle(image: ImageData): Circle | null {
     circle.y + circle.radius > h
   )
     return null;
+  // Validate against ALL original contour points, including points trimmed
+  // during fitting. Otherwise a rectangle can masquerade as a small circle.
+  const tolerance = Math.max(2, circle.radius * 0.05);
+  const inliers = points.filter(
+    ([x, y]) =>
+      Math.abs(Math.hypot(x - circle.x, y - circle.y) - circle.radius) <=
+      tolerance,
+  );
+  if (inliers.length / points.length < 0.7) return null;
+  const ys = inliers.map(([, y]) => y);
+  if (Math.max(...ys) - Math.min(...ys) < circle.radius * 0.8) return null;
   return circle;
 }
