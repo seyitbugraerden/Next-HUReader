@@ -30,6 +30,8 @@ npm run start:prod
 4. Kesikli turuncu numune sınırını ve yeşil ölçüm alanını kontrol edin. Otomatik seçim bir öneridir. Elle seçim seçeneğiyle X/Y merkezi ve yarıçapı değiştirin; görüntüye tıklayarak merkezi taşıyabilirsiniz. Değişikliklerden sonra yeniden analiz edin.
 5. Sonuçları inceleyin ve **Excel raporunu indir** ile dört sayfalı raporu alın.
 
+Üstteki aşama göstergesi yükleme, ölçüm ve raporlama durumunu takip eder. Önizlemedeki tam ekran düğmesiyle kesiti büyütebilir, **Kullanım rehberi** düğmesiyle kısa açıklamaları açabilirsiniz. Ölçüm notları sonuçlar bölümünde açılıp kapatılabilir. Arayüz masaüstü ve mobil ekranlara uyarlanır.
+
 ## Ölçümler
 
 - Kenar payı uygulanmış numune, tam numune ve tüm geçerli görüntü için piksel sayısı, alan, ortalama, popülasyon standart sapması, medyan, minimum, maksimum ve %5/%95 yüzdelikleri.
