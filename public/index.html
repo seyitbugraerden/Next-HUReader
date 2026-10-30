@@ -149,8 +149,8 @@
                 <span class="eyebrow">ADIM 01 / 03</span>
                 <h2>Analiz edilecek görüntüleri seçin</h2>
                 <p>
-                  Dosyanızı yükleyerek başlayın. Ölçüm ayarlarını sonraki adımda
-                  belirleyebilirsiniz.
+                  Dosyaları veya bir klasörü seçerek başlayın. Ölçüm ayarlarını
+                  sonraki adımda belirleyebilirsiniz.
                 </p>
               </div>
               <span class="badge">GÖRÜNTÜ KAYNAĞI</span>
@@ -177,8 +177,32 @@
                       name="file"
                       type="file"
                       multiple
-                      accept=".dcm,.dicom,application/dicom,image/png,image/jpeg"
+                      accept=".dcm,.dicom,.ima,application/dicom,image/png,image/jpeg"
                   /></label>
+                  <div class="folder-picker">
+                    <button id="choose-folder" class="secondary" type="button">
+                      <svg class="icon"><use href="#i-upload" /></svg>Klasör seç</button
+                    ><span>Alt klasörler dahil taranır.</span
+                    ><input
+                      id="folder"
+                      type="file"
+                      webkitdirectory
+                      multiple
+                      hidden
+                      aria-label="İncelenecek klasörü seçin"
+                    />
+                  </div>
+                  <p id="folder-support" class="quiet" hidden>
+                    Tarayıcınız klasör seçimini desteklemiyor. Dosyaları çoklu
+                    seçimle ekleyebilirsiniz.
+                  </p>
+                  <div
+                    id="import-summary"
+                    class="import-summary"
+                    role="status"
+                    aria-live="polite"
+                    hidden
+                  ></div>
                   <div class="file-info" id="file-info" hidden>
                     <span class="file-type" id="file-type"></span
                     ><span id="file-size"></span

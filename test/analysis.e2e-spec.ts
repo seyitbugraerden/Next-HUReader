@@ -52,6 +52,28 @@ describe('Analysis HTTP API', () => {
     expect(res.headers['content-type']).toContain('spreadsheetml');
     expect(res.headers['content-disposition']).toContain('HUReader-rapor.xlsx');
   });
+  it('preserves folder-relative paths without using them as filesystem paths', async () => {
+    const res = await upload()
+      .field('sourcePath', 'Numuneler/seri-1/Z01.dcm')
+      .attach('file', dicomFixture(), { filename: 'Z01.dcm' })
+      .expect(201);
+    expect(res.body.filename).toBe('Numuneler/seri-1/Z01.dcm');
+    expect(res.body.measurements[0].mean).toBe(-24);
+  });
+  it('rejects absolute, traversal and ambiguous relative source paths', async () => {
+    for (const sourcePath of [
+      '/private/CT.dcm',
+      '../CT.dcm',
+      'seri/../CT.dcm',
+      'seri//CT.dcm',
+      'seri\\CT.dcm',
+    ]) {
+      await upload()
+        .field('sourcePath', sourcePath)
+        .attach('file', dicomFixture(), { filename: 'Z01.dcm' })
+        .expect(400);
+    }
+  });
   it('rejects missing, invalid and malformed input', async () => {
     await request(app.getHttpServer()).post('/api/analyze').expect(400);
     await upload()

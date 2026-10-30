@@ -1,6 +1,8 @@
 const $ = (selector) => document.querySelector(selector);
 const form = $('#analysis-form');
 const fileInput = $('#file');
+const folderInput = $('#folder');
+let importing = false;
 let file = null;
 let result = null;
 let analyzedBody = null;
@@ -21,6 +23,7 @@ const optionNames = [
   'windowMin',
   'windowMax',
 ];
+const entryLabel = (entry) => entry.relativePath || entry.file.name;
 const activeEntry = () => entries.find((entry) => entry.id === activeId);
 const readyEntries = () =>
   entries.filter((entry) => entry.result && !entry.dirty);
@@ -88,7 +91,7 @@ function renderQueue() {
       row.className = 'queue-row';
       const name = document.createElement('span');
       name.className = 'queue-name';
-      name.textContent = entry.file.name;
+      name.textContent = entryLabel(entry);
       const status = document.createElement('span');
       status.className = `queue-state ${entry.error ? 'has-error' : entry.result && !entry.dirty ? 'is-ready' : ''}`;
       status.textContent = entryStatus(entry);
@@ -97,8 +100,11 @@ function renderQueue() {
       remove.type = 'button';
       remove.className = 'icon-button';
       remove.textContent = '×';
-      remove.disabled = busy;
-      remove.setAttribute('aria-label', `${entry.file.name} dosyasını kaldır`);
+      remove.disabled = busy || importing;
+      remove.setAttribute(
+        'aria-label',
+        `${entryLabel(entry)} dosyasını kaldır`,
+      );
       remove.addEventListener('click', () => removeEntry(entry.id));
       row.append(name, status, remove);
       return row;
@@ -113,7 +119,7 @@ function renderQueue() {
       ...list.map((entry) => {
         const option = document.createElement('option');
         option.value = entry.id;
-        option.textContent = `${entries.indexOf(entry) + 1}. ${entry.file.name} — ${entryStatus(entry)}`;
+        option.textContent = `${entries.indexOf(entry) + 1}. ${entryLabel(entry)} — ${entryStatus(entry)}`;
         return option;
       }),
     );
@@ -132,7 +138,7 @@ function renderQueue() {
         valid = entry.result && !entry.dirty,
         m = valid ? entry.result.measurements[0] : null;
       for (const value of [
-        entry.file.name,
+        entryLabel(entry),
         entryStatus(entry),
         valid ? unitLabel(entry.result.unit) : '—',
         fmt(m?.mean),
@@ -175,9 +181,11 @@ function selectEntry(id, save = true) {
   $('#image-canvas').hidden = true;
   $('#empty').hidden = false;
   $('#dimensions').textContent = '— × — px';
-  $('#image-title').textContent = file?.name ?? 'Görüntü önizlemesi';
-  $('#selected-file-name').textContent = file?.name ?? '—';
-  $('#report-file-name').textContent = file?.name ?? '—';
+  $('#image-title').textContent = entry
+    ? entryLabel(entry)
+    : 'Görüntü önizlemesi';
+  $('#selected-file-name').textContent = entry ? entryLabel(entry) : '—';
+  $('#report-file-name').textContent = entry ? entryLabel(entry) : '—';
   $('#image-badge').textContent = result
     ? unitLabel(result.unit)
     : file
@@ -196,7 +204,7 @@ function selectEntry(id, save = true) {
   syncWorkflow();
 }
 function removeEntry(id) {
-  if (busy) return;
+  if (busy || importing) return;
   $('#batch-progress').hidden = true;
   saveCurrent();
   entries = entries.filter((entry) => entry.id !== id);
@@ -245,7 +253,7 @@ function syncWorkflow() {
     const tab = $(`#step-${name}`);
     const allowed =
       step === 1 || (step === 2 && entries.length) || (step === 3 && hasReady);
-    tab.disabled = busy || !allowed;
+    tab.disabled = busy || importing || !allowed;
     tab.classList.toggle('active', currentStep === step);
     tab.classList.toggle(
       'complete',
@@ -257,7 +265,11 @@ function syncWorkflow() {
     tab.tabIndex = currentStep === step ? 0 : -1;
     $(`#panel-${name}`).hidden = currentStep !== step;
   });
-  $('#go-analyze').disabled = busy || !entries.length;
+  $('#go-analyze').disabled = busy || importing || !entries.length;
+  fileInput.disabled = busy || importing;
+  folderInput.disabled = busy || importing;
+  $('#choose-folder').disabled =
+    busy || importing || !('webkitdirectory' in folderInput);
   $('#go-report').disabled = busy || !hasReady;
   $('#analyze-all').disabled = busy || !entries.length;
   $('#export-batch').disabled = busy || !hasReady;
@@ -270,6 +282,7 @@ function syncWorkflow() {
 function setWorkflow(step, focus = false) {
   if (
     busy ||
+    importing ||
     (step === 2 && !entries.length) ||
     (step === 3 && !readyEntries().length)
   )
@@ -350,40 +363,113 @@ form.addEventListener('input', (event) => {
     drawPreview();
   }
 });
-function chooseFiles(files) {
-  if (busy) return;
+async function supportedFile(file) {
+  if (
+    /\.(png|jpe?g|dcm|dicom|ima)$/i.test(file.name) ||
+    ['image/png', 'image/jpeg', 'application/dicom'].includes(file.type)
+  )
+    return true;
+  // Many scanner exports have no extension, or a numeric extension.
+  const bytes = new Uint8Array(await file.slice(0, 132).arrayBuffer());
+  return (
+    (bytes.length >= 132 &&
+      String.fromCharCode(...bytes.slice(128, 132)) === 'DICM') ||
+    (bytes.length >= 8 &&
+      [137, 80, 78, 71, 13, 10, 26, 10].every((v, i) => bytes[i] === v)) ||
+    (bytes.length >= 3 &&
+      bytes[0] === 255 &&
+      bytes[1] === 216 &&
+      bytes[2] === 255)
+  );
+}
+async function chooseFiles(selection, fromFolder = false) {
+  if (busy || importing) return;
+  importing = true;
+  const files = [...selection].sort((a, b) =>
+    (a.webkitRelativePath || a.name).localeCompare(
+      b.webkitRelativePath || b.name,
+      'tr',
+      { numeric: true },
+    ),
+  );
   $('#batch-progress').hidden = true;
+  $('#error').hidden = true;
+  $('#import-summary').hidden = false;
+  $('#import-summary').textContent = `${files.length} dosya inceleniyor…`;
   saveCurrent();
-  const rejected = [];
-  let firstAdded = null;
-  for (const selected of files) {
-    if (selected.size > 20 * 1024 * 1024) {
-      rejected.push(selected.name);
-      continue;
-    }
-    const entry = {
-      id: crypto.randomUUID(),
-      file: selected,
-      result: null,
-      dirty: true,
-      body: null,
-      error: null,
-      processing: false,
-      settings: { manual: false, estimate: false, values: {} },
-    };
-    entries.push(entry);
-    firstAdded ??= entry.id;
-  }
-  if (!activeEntry() && firstAdded) selectEntry(firstAdded, false);
-  $('#upload-guidance').textContent = entries.length
-    ? 'Dosyalar seçildi. Her dosya için ölçüm ayarlarıyla devam edebilirsiniz.'
-    : 'Devam etmek için bir görüntü seçin.';
-  fileInput.value = '';
   syncWorkflow();
-  if (rejected.length)
-    showError(
-      `Dosya başına 20 MB sınırını aşan dosyalar eklenmedi: ${rejected.join(', ')}`,
-    );
+  let added = 0,
+    skipped = 0,
+    duplicates = 0;
+  const rejected = [];
+  const known = new Set(entries.map((entry) => entry.sourceKey));
+  let firstAdded = null;
+  try {
+    for (const selected of files) {
+      const relativePath = selected.webkitRelativePath || selected.name;
+      if (relativePath.split('/').some((part) => part.startsWith('.'))) {
+        skipped++;
+        continue;
+      }
+      if (selected.size > 20 * 1024 * 1024) {
+        rejected.push(relativePath);
+        continue;
+      }
+      const sourceKey = `${fromFolder ? 'folder' : 'file'}:${relativePath}:${selected.size}:${selected.lastModified}`;
+      if (known.has(sourceKey)) {
+        duplicates++;
+        continue;
+      }
+      if (!(await supportedFile(selected))) {
+        skipped++;
+        continue;
+      }
+      const entry = {
+        id: crypto.randomUUID(),
+        file: selected,
+        relativePath,
+        sourceKey,
+        result: null,
+        dirty: true,
+        body: null,
+        error: null,
+        processing: false,
+        settings: { manual: false, estimate: false, values: {} },
+      };
+      entries.push(entry);
+      known.add(sourceKey);
+      firstAdded ??= entry.id;
+      added++;
+    }
+    if (!activeEntry() && firstAdded) selectEntry(firstAdded, false);
+    const folderName = fromFolder
+      ? files[0]?.webkitRelativePath.split('/')[0]
+      : null;
+    $('#import-summary').textContent =
+      `${folderName ? folderName + ' · ' : ''}${added} dosya eklendi${skipped ? ` · ${skipped} desteklenmeyen/gizli dosya atlandı` : ''}${duplicates ? ` · ${duplicates} dosya zaten listede` : ''}${rejected.length ? ` · ${rejected.length} dosya boyut sınırını aşıyor` : ''}.`;
+    if (!files.length)
+      $('#import-summary').textContent =
+        'Klasörde okunabilir dosya bulunamadı.';
+    if (rejected.length)
+      showError(
+        `Dosya başına 20 MB sınırını aşan dosyalar eklenmedi: ${rejected.join(', ')}`,
+      );
+  } catch (error) {
+    showError(`Dosyalar okunurken bir hata oluştu: ${error.message}`);
+  } finally {
+    importing = false;
+    fileInput.value = '';
+    folderInput.value = '';
+    syncWorkflow();
+  }
+}
+$('#choose-folder').addEventListener('click', () => folderInput.click());
+folderInput.addEventListener('change', () =>
+  chooseFiles(folderInput.files, true),
+);
+if (!('webkitdirectory' in folderInput)) {
+  $('#choose-folder').disabled = true;
+  $('#folder-support').hidden = false;
 }
 fileInput.addEventListener('change', () => chooseFiles(fileInput.files));
 for (const name of ['dragenter', 'dragover'])
@@ -476,6 +562,7 @@ $('#image-canvas').addEventListener('click', (event) => {
 function requestBody() {
   const body = new FormData(form);
   body.set('file', file);
+  body.set('sourcePath', entryLabel(activeEntry()));
   return body;
 }
 function setBusy(value) {
@@ -756,6 +843,7 @@ function bodyForEntry(entry) {
     );
   const body = new FormData();
   body.set('file', entry.file);
+  body.set('sourcePath', entryLabel(entry));
   for (const key of optionNames) {
     if (
       ['centerX', 'centerY', 'radius'].includes(key) &&
@@ -792,7 +880,7 @@ $('#analyze-all').addEventListener('click', async () => {
       entry.processing = true;
       entry.error = null;
       $('#batch-progress').textContent =
-        `${index + 1}/${pending.length} işleniyor · ${entry.file.name}`;
+        `${index + 1}/${pending.length} işleniyor · ${entryLabel(entry)}`;
       renderQueue();
       try {
         const body = bodyForEntry(entry);

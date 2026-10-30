@@ -1932,3 +1932,38 @@ select {
     width: 100%;
   }
 }
+
+.folder-picker {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 15px;
+}
+.folder-picker .secondary {
+  gap: 8px;
+}
+.folder-picker .icon {
+  width: 15px;
+  height: 15px;
+}
+.folder-picker > span {
+  font-size: 11px;
+  color: #7b8e9e;
+}
+.import-summary {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid #cce4dc;
+  border-radius: 7px;
+  color: #40816f;
+  background: #f0f8f5;
+  font-size: 11px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 760px) {
+  .folder-picker {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+}

@@ -19,8 +19,8 @@ import { AnalysisService, parseOptions } from './analysis.service.js';
     limits: {
       fileSize: 20 * 1024 * 1024,
       files: 1,
-      fields: 8,
-      fieldSize: 128,
+      fields: 9,
+      fieldSize: 4096,
     },
   }),
 )
@@ -36,9 +36,26 @@ export class AnalysisController {
         'Analiz için bir görüntü dosyası yükleyin.',
       );
     }
+    const sourcePath = body.sourcePath;
+    if (
+      sourcePath !== undefined &&
+      (typeof sourcePath !== 'string' ||
+        !sourcePath ||
+        sourcePath.length > 4096 ||
+        sourcePath.startsWith('/') ||
+        sourcePath.includes('\\') ||
+        sourcePath.includes('\0') ||
+        sourcePath
+          .split('/')
+          .some((part) => !part || part === '.' || part === '..'))
+    ) {
+      throw new BadRequestException(
+        'Klasör içi yol geçerli bir göreli dosya yolu olmalıdır.',
+      );
+    }
     return this.analysis.analyze(
       file.buffer,
-      file.originalname,
+      typeof sourcePath === 'string' ? sourcePath : file.originalname,
       parseOptions(body),
     );
   }

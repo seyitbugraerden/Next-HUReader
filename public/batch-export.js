@@ -69,7 +69,7 @@ async function createBatchWorkbook(entries) {
     const ready = entry.result && !entry.dirty;
     sheets.status.addRow([
       index + 1,
-      entry.file.name,
+      entry.relativePath || entry.file.name,
       ready
         ? 'Hesaplandı'
         : entry.error
