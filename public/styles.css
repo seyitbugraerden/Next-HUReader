@@ -1530,3 +1530,262 @@ dialog .primary {
     scroll-behavior: auto !important;
   }
 }
+
+/* Step-by-step analysis workspace */
+.workflow {
+  margin-bottom: 25px;
+}
+.workflow > button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 17px 24px;
+  color: #6c7e91;
+  position: relative;
+  background: white;
+  border: 0;
+  text-align: left;
+  min-width: 0;
+}
+.workflow > button + button {
+  border-left: 1px solid var(--line);
+}
+.workflow > button.active {
+  background: #f0f9f7;
+  color: #12665f;
+}
+.workflow > button.complete {
+  color: #157d73;
+}
+.workflow > button:disabled {
+  opacity: 1;
+  color: #94a1af;
+  cursor: not-allowed;
+}
+.workflow > button:not(:disabled):hover {
+  background: #f2f8f7;
+}
+.workflow > button:focus-visible {
+  outline-offset: -4px;
+}
+.step-copy {
+  font-size: 12px;
+  font-weight: 550;
+}
+.wizard-workspace {
+  scroll-margin-top: 24px;
+}
+[role='tabpanel']:focus {
+  outline: none;
+}
+.stage-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin: 28px 0 23px;
+}
+.stage-heading h2 {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.6px;
+  margin-top: 12px;
+}
+.stage-heading p {
+  color: #718397;
+  font-size: 12px;
+  margin: 9px 0 0;
+}
+.stage-heading > .badge {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 260px;
+}
+.upload-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.upload-layout .dropzone {
+  min-height: 270px;
+}
+.upload-guide {
+  padding: 28px;
+}
+.upload-guide h2 {
+  font-size: 20px;
+  letter-spacing: -0.5px;
+  font-weight: 600;
+  margin-top: 15px;
+}
+.upload-guide > p {
+  font-size: 12px;
+  color: #7a8c9d;
+  margin-bottom: 22px;
+}
+.upload-guide ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.upload-guide li {
+  position: relative;
+  padding: 17px 0 17px 22px;
+  border-top: 1px solid #edf1f5;
+}
+.upload-guide li::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  position: absolute;
+  left: 0;
+  top: 22px;
+  background: #61a598;
+  border-radius: 50%;
+}
+.upload-guide li b {
+  display: block;
+  font-size: 12px;
+  font-weight: 550;
+  color: #3f5a6e;
+}
+.upload-guide li span {
+  display: block;
+  font-size: 11px;
+  color: #7c8c9d;
+  line-height: 1.75;
+  margin-top: 7px;
+}
+.wizard-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border-top: 1px solid var(--line);
+  padding: 21px 0 4px;
+  margin-top: 12px;
+}
+.wizard-actions > p {
+  color: #7c8fa0;
+  font-size: 12px;
+  margin: 0;
+}
+.wizard-actions .primary {
+  width: auto;
+  min-width: 240px;
+  gap: 30px;
+  margin: 0;
+}
+.back-button {
+  border: 0;
+  background: transparent;
+  color: #627d91;
+  font-size: 12px;
+  padding: 11px 0;
+}
+.back-button:hover:not(:disabled) {
+  color: #0c7c75;
+}
+.review-ready {
+  background: #edf8f3;
+  color: #367c6a;
+  border: 1px solid #cce7dc;
+  border-radius: 9px;
+  padding: 18px 20px;
+  margin: 18px 0;
+}
+.review-ready b {
+  font-size: 12px;
+  font-weight: 550;
+}
+.review-ready p {
+  font-size: 11px;
+  line-height: 1.8;
+  margin: 7px 0 0;
+  color: #638d7e;
+}
+.report-context {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  padding: 7px 0 16px;
+  border-bottom: 1px solid var(--line);
+}
+.report-context > div {
+  min-width: 0;
+}
+#report-file-name {
+  display: block;
+  font-size: 12px;
+  color: #6f8598;
+  margin-top: 10px;
+  overflow-wrap: anywhere;
+}
+#panel-report .results-heading {
+  margin-top: 23px;
+}
+#panel-report .metrics strong {
+  font-size: 34px;
+}
+@media (max-width: 1100px) {
+  .workflow > button {
+    padding: 16px;
+    gap: 10px;
+  }
+  .stage-heading > .badge {
+    max-width: 200px;
+  }
+}
+@media (max-width: 760px) {
+  .workflow > button {
+    padding: 13px 9px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 9px;
+  }
+  .step-copy {
+    font-size: 10px;
+    line-height: 1.5;
+  }
+  .upload-layout {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .upload-layout .dropzone {
+    min-height: 210px;
+  }
+  .stage-heading {
+    margin: 24px 0 20px;
+  }
+  .stage-heading h2 {
+    font-size: 20px;
+  }
+  .stage-heading > .badge {
+    display: none;
+  }
+  .wizard-actions {
+    flex-wrap: wrap;
+    gap: 15px;
+  }
+  .wizard-actions > p {
+    font-size: 11px;
+  }
+  .wizard-actions .primary {
+    width: 100%;
+    justify-content: space-between;
+    min-width: 0;
+  }
+  .wizard-actions .back-button {
+    width: 100%;
+    text-align: left;
+  }
+  .report-context {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  #panel-report .metrics strong {
+    font-size: 28px;
+  }
+}

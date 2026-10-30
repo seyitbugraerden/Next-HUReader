@@ -80,364 +80,504 @@
           </div>
         </div>
       </div>
-      <ol class="workflow" aria-label="Analiz aşamaları">
-        <li id="step-upload" class="active" aria-current="step">
-          <span class="step-index">01</span>
-          <div>Görüntü yükle<small>DICOM, PNG veya JPG</small></div>
-          <span class="step-indicator">→</span>
-        </li>
-        <li id="step-analyze">
-          <span class="step-index">02</span>
-          <div>
-            Ölçüm alanını incele<small>Numune sınırını doğrulayın</small>
-          </div>
-          <span class="step-indicator">→</span>
-        </li>
-        <li id="step-report">
-          <span class="step-index">03</span>
-          <div>Sonuçları raporla<small>Tablolar ve Excel çıktısı</small></div>
-        </li>
-      </ol>
-      <div class="workspace" id="workspace">
-        <aside>
-          <form id="analysis-form">
-            <section class="card upload-card">
-              <div class="section-title">
-                <span class="number">01</span>
-                <h2>Görüntü kaynağı</h2>
-              </div>
-              <label class="dropzone" id="dropzone" for="file"
-                ><span class="upload-symbol"
-                  ><svg class="icon"><use href="#i-upload" /></svg></span
-                ><strong id="file-label">Görüntüyü sürükleyip bırakın</strong
-                ><span>veya bilgisayarınızdan dosya seçin</span
-                ><small
-                  >DICOM · PNG · JPG <span class="format-divider">/</span> Maks.
-                  20 MB</small
-                ><input
-                  id="file"
-                  name="file"
-                  type="file"
-                  accept=".dcm,.dicom,application/dicom,image/png,image/jpeg"
-                  required
-              /></label>
-              <div class="file-info" id="file-info" hidden>
-                <span class="file-type" id="file-type"></span
-                ><span id="file-size"></span
-                ><span class="file-ready">Yüklendi</span>
-              </div>
-              <p class="quiet privacy-note">
-                <svg class="icon"><use href="#i-shield" /></svg>Dosyalar
-                sunucunun belleğinde işlenir; diske kaydedilmez.
-              </p>
-            </section>
-            <section class="card settings-card">
-              <div class="section-title">
-                <span class="number">02</span>
-                <h2>Ölçüm ayarları</h2>
-                <span class="section-meta">ROI</span>
-              </div>
-              <label class="check-row"
-                ><input id="manual" type="checkbox" /><span
-                  >Ölçüm alanını elle belirle<small
-                    >Kapalıyken dairesel sınır otomatik önerilir.</small
-                  ></span
-                ></label
-              >
-              <div class="grid-three">
-                <label
-                  >Merkez X <span>px</span
-                  ><input
-                    name="centerX"
-                    type="number"
-                    step="any"
-                    min="0"
-                    disabled
-                    placeholder="Otomatik" /></label
-                ><label
-                  >Merkez Y <span>px</span
-                  ><input
-                    name="centerY"
-                    type="number"
-                    step="any"
-                    min="0"
-                    disabled
-                    placeholder="Otomatik" /></label
-                ><label
-                  >Yarıçap <span>px</span
-                  ><input
-                    name="radius"
-                    type="number"
-                    step="any"
-                    min="2"
-                    disabled
-                    placeholder="Otomatik"
-                /></label>
-              </div>
-              <label class="field"
-                >Kenar payı <span>px</span
-                ><input
-                  name="insetPixels"
-                  type="number"
-                  min="0"
-                  step="any"
-                  placeholder="DICOM: 2,1 mm / Görsel: 10 px"
-              /></label>
-              <p class="quiet">
-                Kenar bulanıklığı ve destek etkisini azaltmak için numune sınırı
-                içeri alınır.
-              </p>
-              <details>
-                <summary>Piksel boyutu ve kalibrasyon <span>+</span></summary>
-                <p class="quiet">
-                  DICOM bilgileri dosyadan okunur. Aşağıdaki alanlar yalnızca
-                  PNG/JPG için geçerlidir.
-                </p>
-                <div class="grid-two">
-                  <label
-                    >Piksel boyutu X <span>mm</span
-                    ><input
-                      name="spacingX"
-                      type="number"
-                      step="any"
-                      min="0.000001"
-                      placeholder="Örn. 0,2109" /></label
-                  ><label
-                    >Piksel boyutu Y <span>mm</span
-                    ><input
-                      name="spacingY"
-                      type="number"
-                      step="any"
-                      min="0.000001"
-                      placeholder="Örn. 0,2109"
-                  /></label>
-                </div>
-                <label class="check-row"
-                  ><input id="estimate" type="checkbox" /><span
-                    >Pencere aralığından yaklaşık HU<small
-                      >Yalnızca görüntünün özgün pencere aralığını
-                      biliyorsanız.</small
-                    ></span
-                  ></label
-                >
-                <div class="grid-two">
-                  <label
-                    >Alt sınır <span>HU</span
-                    ><input
-                      name="windowMin"
-                      type="number"
-                      step="any"
-                      placeholder="−1000"
-                      disabled /></label
-                  ><label
-                    >Üst sınır <span>HU</span
-                    ><input
-                      name="windowMax"
-                      type="number"
-                      step="any"
-                      placeholder="1000"
-                      disabled
-                  /></label>
-                </div>
-              </details>
-              <button class="primary" id="analyze" type="submit">
-                <span>Kesiti analiz et</span><span>↗</span>
-              </button>
-            </section>
-          </form>
-          <div class="sidebar-note">
-            <svg class="icon"><use href="#i-help" /></svg>
-            <p>
-              <b>Ölçümün kaynağı önemli.</b><br />Özgün DICOM sayısal HU ölçümü
-              sağlar. PNG/JPG varsayılan olarak gri ton yoğunluğu verir.
-            </p>
-          </div>
-        </aside>
-        <div class="main-panel">
-          <div id="error" class="error" role="alert" hidden></div>
-          <div
-            id="status"
-            class="status"
-            role="status"
-            aria-live="polite"
-            hidden
-          ></div>
-          <section class="card viewer-card" id="preview-panel">
-            <div class="viewer-header">
+      <nav class="wizard-navigation" aria-label="Analiz aşamaları">
+        <div class="workflow" role="tablist" aria-label="Analiz adımları">
+          <button
+            id="step-upload"
+            type="button"
+            role="tab"
+            class="active"
+            aria-selected="true"
+            aria-controls="panel-upload"
+            tabindex="0"
+          >
+            <span class="step-index">01</span
+            ><span class="step-copy"
+              >Görüntü yükle<small>DICOM, PNG veya JPG</small></span
+            ><span class="step-indicator">→</span>
+          </button>
+          <button
+            id="step-analyze"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="panel-analyze"
+            tabindex="-1"
+            disabled
+          >
+            <span class="step-index">02</span
+            ><span class="step-copy"
+              >Ölçüm alanını incele<small>Ayarlar ve numune sınırı</small></span
+            ><span class="step-indicator">→</span>
+          </button>
+          <button
+            id="step-report"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="panel-report"
+            tabindex="-1"
+            disabled
+          >
+            <span class="step-index">03</span
+            ><span class="step-copy"
+              >Sonuçlar ve rapor<small>Tablolar ve Excel çıktısı</small></span
+            >
+          </button>
+        </div>
+      </nav>
+      <div id="workspace" class="wizard-workspace">
+        <div id="error" class="error" role="alert" hidden></div>
+        <div
+          id="status"
+          class="status"
+          role="status"
+          aria-live="polite"
+          hidden
+        ></div>
+        <form id="analysis-form">
+          <section
+            id="panel-upload"
+            role="tabpanel"
+            aria-labelledby="step-upload"
+            tabindex="0"
+          >
+            <div class="stage-heading">
               <div>
-                <div class="eyebrow">KESİT ÖNİZLEMESİ</div>
-                <h2 id="image-title">Görüntü önizlemesi</h2>
+                <span class="eyebrow">ADIM 01 / 03</span>
+                <h2>Analiz edilecek görüntüyü seçin</h2>
+                <p>
+                  Dosyanızı yükleyerek başlayın. Ölçüm ayarlarını sonraki adımda
+                  belirleyebilirsiniz.
+                </p>
               </div>
-              <div class="viewer-actions">
-                <span id="image-badge" class="badge">Görüntü bekleniyor</span
-                ><button
-                  class="icon-button"
-                  id="expand-preview"
-                  type="button"
-                  aria-label="Önizlemeyi tam ekranda aç"
-                  title="Tam ekran"
+              <span class="badge">GÖRÜNTÜ KAYNAĞI</span>
+            </div>
+            <div class="upload-layout">
+              <div>
+                <section class="card upload-card">
+                  <div class="section-title">
+                    <span class="number">01</span>
+                    <h2>Görüntü kaynağı</h2>
+                  </div>
+                  <label class="dropzone" id="dropzone" for="file"
+                    ><span class="upload-symbol"
+                      ><svg class="icon"><use href="#i-upload" /></svg></span
+                    ><strong id="file-label"
+                      >Görüntüyü sürükleyip bırakın</strong
+                    ><span>veya bilgisayarınızdan dosya seçin</span
+                    ><small
+                      >DICOM · PNG · JPG
+                      <span class="format-divider">/</span> Maks. 20 MB</small
+                    ><input
+                      id="file"
+                      name="file"
+                      type="file"
+                      accept=".dcm,.dicom,application/dicom,image/png,image/jpeg"
+                      required
+                  /></label>
+                  <div class="file-info" id="file-info" hidden>
+                    <span class="file-type" id="file-type"></span
+                    ><span id="file-size"></span
+                    ><span class="file-ready">Yüklendi</span>
+                  </div>
+                  <p class="quiet privacy-note">
+                    <svg class="icon"><use href="#i-shield" /></svg>Dosyalar
+                    sunucunun belleğinde işlenir; diske kaydedilmez.
+                  </p>
+                </section>
+                <div class="sidebar-note">
+                  <svg class="icon"><use href="#i-help" /></svg>
+                  <p>
+                    <b>Ölçümün kaynağı önemli.</b><br />Özgün DICOM sayısal HU
+                    ölçümü sağlar. PNG/JPG varsayılan olarak gri ton yoğunluğu
+                    verir.
+                  </p>
+                </div>
+              </div>
+              <div class="upload-guide card">
+                <span class="eyebrow">BAŞLAMADAN ÖNCE</span>
+                <h2>Doğru görüntü, anlamlı ölçüm.</h2>
+                <p>
+                  Tek bir kesit yükleyin. Numunenin tamamının görünür olduğundan
+                  emin olun.
+                </p>
+                <ul>
+                  <li>
+                    <b>Özgün CT DICOM</b
+                    ><span
+                      >Kalibrasyon bilgileri dosyadan okunur; ölçümler HU
+                      cinsinden hesaplanır.</span
+                    >
+                  </li>
+                  <li>
+                    <b>PNG veya JPG</b
+                    ><span
+                      >Gri ton yoğunluğu ölçülür. Bilinen pencere aralığıyla
+                      yaklaşık HU hesaplanabilir.</span
+                    >
+                  </li>
+                  <li>
+                    <b>Alanı birlikte kontrol edin</b
+                    ><span
+                      >Otomatik çemberi inceleyin; gerekiyorsa merkez, yarıçap
+                      ve kenar payını düzeltin.</span
+                    >
+                  </li>
+                </ul>
+              </div>
+            </div>
+            <div class="wizard-actions">
+              <p id="upload-guidance">Devam etmek için bir görüntü seçin.</p>
+              <button id="go-analyze" class="primary" type="button" disabled>
+                <span>Ölçüm ayarlarına geç</span><span>→</span>
+              </button>
+            </div>
+          </section>
+          <section
+            id="panel-analyze"
+            role="tabpanel"
+            aria-labelledby="step-analyze"
+            tabindex="0"
+            hidden
+          >
+            <div class="stage-heading">
+              <div>
+                <span class="eyebrow">ADIM 02 / 03</span>
+                <h2>Ölçüm alanını belirleyin</h2>
+                <p>
+                  Ölçümü hesaplayın, ardından görüntü üzerindeki yeşil alanı
+                  kontrol edin.
+                </p>
+              </div>
+              <span class="badge" id="selected-file-name">—</span>
+            </div>
+            <div class="workspace">
+              <aside>
+                <section class="card settings-card">
+                  <div class="section-title">
+                    <span class="number">02</span>
+                    <h2>Ölçüm ayarları</h2>
+                    <span class="section-meta">ROI</span>
+                  </div>
+                  <label class="check-row"
+                    ><input id="manual" type="checkbox" /><span
+                      >Ölçüm alanını elle belirle<small
+                        >Kapalıyken dairesel sınır otomatik önerilir.</small
+                      ></span
+                    ></label
+                  >
+                  <div class="grid-three">
+                    <label
+                      >Merkez X <span>px</span
+                      ><input
+                        name="centerX"
+                        type="number"
+                        step="any"
+                        min="0"
+                        disabled
+                        placeholder="Otomatik" /></label
+                    ><label
+                      >Merkez Y <span>px</span
+                      ><input
+                        name="centerY"
+                        type="number"
+                        step="any"
+                        min="0"
+                        disabled
+                        placeholder="Otomatik" /></label
+                    ><label
+                      >Yarıçap <span>px</span
+                      ><input
+                        name="radius"
+                        type="number"
+                        step="any"
+                        min="2"
+                        disabled
+                        placeholder="Otomatik"
+                    /></label>
+                  </div>
+                  <label class="field"
+                    >Kenar payı <span>px</span
+                    ><input
+                      name="insetPixels"
+                      type="number"
+                      min="0"
+                      step="any"
+                      placeholder="DICOM: 2,1 mm / Görsel: 10 px"
+                  /></label>
+                  <p class="quiet">
+                    Kenar bulanıklığı ve destek etkisini azaltmak için numune
+                    sınırı içeri alınır.
+                  </p>
+                  <details>
+                    <summary>
+                      Piksel boyutu ve kalibrasyon <span>+</span>
+                    </summary>
+                    <p class="quiet">
+                      DICOM bilgileri dosyadan okunur. Aşağıdaki alanlar
+                      yalnızca PNG/JPG için geçerlidir.
+                    </p>
+                    <div class="grid-two">
+                      <label
+                        >Piksel boyutu X <span>mm</span
+                        ><input
+                          name="spacingX"
+                          type="number"
+                          step="any"
+                          min="0.000001"
+                          placeholder="Örn. 0,2109" /></label
+                      ><label
+                        >Piksel boyutu Y <span>mm</span
+                        ><input
+                          name="spacingY"
+                          type="number"
+                          step="any"
+                          min="0.000001"
+                          placeholder="Örn. 0,2109"
+                      /></label>
+                    </div>
+                    <label class="check-row"
+                      ><input id="estimate" type="checkbox" /><span
+                        >Pencere aralığından yaklaşık HU<small
+                          >Yalnızca görüntünün özgün pencere aralığını
+                          biliyorsanız.</small
+                        ></span
+                      ></label
+                    >
+                    <div class="grid-two">
+                      <label
+                        >Alt sınır <span>HU</span
+                        ><input
+                          name="windowMin"
+                          type="number"
+                          step="any"
+                          placeholder="−1000"
+                          disabled /></label
+                      ><label
+                        >Üst sınır <span>HU</span
+                        ><input
+                          name="windowMax"
+                          type="number"
+                          step="any"
+                          placeholder="1000"
+                          disabled
+                      /></label>
+                    </div>
+                  </details>
+                  <button class="primary" id="analyze" type="submit">
+                    <span>Ölçümü hesapla</span><span>↗</span>
+                  </button>
+                </section>
+              </aside>
+              <div class="main-panel">
+                <section class="card viewer-card" id="preview-panel">
+                  <div class="viewer-header">
+                    <div>
+                      <div class="eyebrow">KESİT ÖNİZLEMESİ</div>
+                      <h2 id="image-title">Görüntü önizlemesi</h2>
+                    </div>
+                    <div class="viewer-actions">
+                      <span id="image-badge" class="badge"
+                        >Görüntü bekleniyor</span
+                      ><button
+                        class="icon-button"
+                        id="expand-preview"
+                        type="button"
+                        aria-label="Önizlemeyi tam ekranda aç"
+                        title="Tam ekran"
+                      >
+                        <svg class="icon"><use href="#i-expand" /></svg>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="viewer" id="viewer">
+                    <div class="empty" id="empty">
+                      <div class="scan-mark">
+                        <svg class="icon"><use href="#i-scan" /></svg>
+                      </div>
+                      <span class="empty-overline">KESİT GÖRÜNTÜLEYİCİ</span>
+                      <h3>Analiz için bir görüntü yükleyin</h3>
+                      <p>
+                        Dosyanızı yüklediğinizde kesit burada görünür.<br />Numune
+                        sınırını kontrol ederek ölçüme başlayın.
+                      </p>
+                      <div class="supported-formats">
+                        <span>DICOM</span><span>PNG</span><span>JPG</span>
+                      </div>
+                    </div>
+                    <canvas
+                      id="image-canvas"
+                      hidden
+                      aria-label="Numune kesiti ve ölçüm çemberi"
+                    ></canvas
+                    ><span class="viewer-corner"
+                      >CT VIEWPORT <span>•</span> ROI</span
+                    >
+                  </div>
+                  <div class="viewer-footer">
+                    <span><i class="legend green"></i>Analiz edilen alan</span
+                    ><span><i class="legend orange"></i>Numune dış sınırı</span
+                    ><span id="dimensions">— × — px</span>
+                  </div>
+                  <p class="quiet canvas-hint" id="canvas-hint" hidden>
+                    Elle seçim açıkken görüntüye tıklayarak merkezi
+                    taşıyabilirsiniz. Değişiklikleri uygulamak için yeniden
+                    analiz edin.
+                  </p>
+                </section>
+                <div
+                  id="review-ready"
+                  class="review-ready"
+                  role="status"
+                  hidden
                 >
-                  <svg class="icon"><use href="#i-expand" /></svg>
+                  <b>Ölçüm hazır. Alanı kontrol edin.</b>
+                  <p>
+                    Yeşil çemberin numunenin içinde kaldığını doğrulayın.
+                    Gerekirse ayarları değiştirip tekrar hesaplayın.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div class="wizard-actions">
+              <button class="back-button" type="button" data-step="1">
+                ← Görüntü seçimine dön</button
+              ><button id="go-report" class="primary" type="button" disabled>
+                <span>Alanı doğrula ve sonuçlara geç</span><span>→</span>
+              </button>
+            </div>
+          </section>
+          <section
+            id="panel-report"
+            role="tabpanel"
+            aria-labelledby="step-report"
+            tabindex="0"
+            hidden
+          >
+            <div class="report-context">
+              <div>
+                <span class="eyebrow">ADIM 03 / 03</span
+                ><span id="report-file-name">—</span>
+              </div>
+              <button class="back-button" type="button" data-step="2">
+                ← Ölçüm alanını düzenle
+              </button>
+            </div>
+            <div id="results">
+              <div class="results-heading">
+                <div>
+                  <div class="eyebrow">ANALİZ SONUÇLARI</div>
+                  <h2>Ölçüm özeti</h2>
+                </div>
+                <button id="export" type="button" class="secondary">
+                  ↓ Excel raporunu indir
                 </button>
               </div>
-            </div>
-            <div class="viewer" id="viewer">
-              <div class="empty" id="empty">
-                <div class="scan-mark">
-                  <svg class="icon"><use href="#i-scan" /></svg>
+              <details class="measurement-notes">
+                <summary>
+                  <span class="notes-title"
+                    >Ölçüm notları <span id="warning-count"></span></span
+                  ><span>+</span>
+                </summary>
+                <div id="warnings" class="warnings"></div>
+              </details>
+              <div class="metrics">
+                <article>
+                  <span>ORTALAMA</span><strong id="metric-mean">—</strong
+                  ><small id="metric-unit">HU</small>
+                </article>
+                <article>
+                  <span>STANDART SAPMA</span><strong id="metric-std">—</strong
+                  ><small>Popülasyon dağılımı</small>
+                </article>
+                <article>
+                  <span>ÖLÇÜM ALANI</span><strong id="metric-area">—</strong
+                  ><small id="area-unit">mm²</small>
+                </article>
+                <article>
+                  <span>PİKSEL SAYISI</span><strong id="metric-count">—</strong
+                  ><small>Kenar payı uygulanmış</small>
+                </article>
+              </div>
+              <section class="card table-card">
+                <div class="section-title">
+                  <span class="number">03</span>
+                  <h2>Kesit bazında ölçümler</h2>
+                  <span class="table-unit" id="table-unit"></span>
                 </div>
-                <span class="empty-overline">KESİT GÖRÜNTÜLEYİCİ</span>
-                <h3>Analiz için bir görüntü yükleyin</h3>
-                <p>
-                  Dosyanızı yüklediğinizde kesit burada görünür.<br />Numune
-                  sınırını kontrol ederek ölçüme başlayın.
+                <div class="table-scroll">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Ölçüm alanı</th>
+                        <th>Piksel</th>
+                        <th>Alan (mm²)</th>
+                        <th>Ort.</th>
+                        <th>Std.</th>
+                        <th>Medyan</th>
+                        <th>Min.</th>
+                        <th>Maks.</th>
+                        <th>%5</th>
+                        <th>%95</th>
+                      </tr>
+                    </thead>
+                    <tbody id="measurements"></tbody>
+                  </table>
+                </div>
+                <p class="quiet table-note">
+                  İlk satır, kenar payı çıkarılmış numune alanıdır. Yüzdelikler
+                  doğrusal enterpolasyonla hesaplanır.
                 </p>
-                <div class="supported-formats">
-                  <span>DICOM</span><span>PNG</span><span>JPG</span>
-                </div>
+              </section>
+              <div class="bottom-grid">
+                <section class="card">
+                  <div class="section-title">
+                    <h2>Yoğunluk dağılımı</h2>
+                    <span class="badge subtle">NUMUNE</span>
+                  </div>
+                  <canvas
+                    id="histogram"
+                    aria-label="Numune yoğunluk histogramı"
+                    role="img"
+                  ></canvas>
+                  <p class="quiet">
+                    X: yoğunluk · Y: piksel sayısı. Çubukların üzerine gelerek
+                    aralığı inceleyin.
+                  </p>
+                  <div
+                    id="histogram-detail"
+                    class="hist-detail"
+                    aria-live="polite"
+                  >
+                    —
+                  </div>
+                </section>
+                <section class="card">
+                  <div class="section-title"><h2>Bölgesel ortalamalar</h2></div>
+                  <div id="regions" class="region-list"></div>
+                  <p class="quiet">
+                    Merkez bölgeleri, kenar payı uygulanmış yarıçap üzerinden
+                    hesaplanır.
+                  </p>
+                </section>
               </div>
-              <canvas
-                id="image-canvas"
-                hidden
-                aria-label="Numune kesiti ve ölçüm çemberi"
-              ></canvas
-              ><span class="viewer-corner">CT VIEWPORT <span>•</span> ROI</span>
+              <section class="card">
+                <details id="metadata-details">
+                  <summary>Kaynak ve ölçüm bilgileri <span>+</span></summary>
+                  <dl id="metadata"></dl>
+                </details>
+              </section>
             </div>
-            <div class="viewer-footer">
-              <span><i class="legend green"></i>Analiz edilen alan</span
-              ><span><i class="legend orange"></i>Numune dış sınırı</span
-              ><span id="dimensions">— × — px</span>
-            </div>
-            <p class="quiet canvas-hint" id="canvas-hint" hidden>
-              Elle seçim açıkken görüntüye tıklayarak merkezi taşıyabilirsiniz.
-              Değişiklikleri uygulamak için yeniden analiz edin.
-            </p>
-          </section>
-          <div id="results" hidden>
-            <div class="results-heading">
-              <div>
-                <div class="eyebrow">ANALİZ SONUÇLARI</div>
-                <h2>Ölçüm özeti</h2>
-              </div>
-              <button id="export" type="button" class="secondary">
-                ↓ Excel raporunu indir
+            <div class="wizard-actions">
+              <button class="back-button" type="button" data-step="2">
+                ← Ölçüm ayarlarına dön</button
+              ><button class="secondary" type="button" data-step="1">
+                Başka bir dosya seç
               </button>
             </div>
-            <details class="measurement-notes">
-              <summary>
-                <span class="notes-title"
-                  >Ölçüm notları <span id="warning-count"></span></span
-                ><span>+</span>
-              </summary>
-              <div id="warnings" class="warnings"></div>
-            </details>
-            <div class="metrics">
-              <article>
-                <span>ORTALAMA</span><strong id="metric-mean">—</strong
-                ><small id="metric-unit">HU</small>
-              </article>
-              <article>
-                <span>STANDART SAPMA</span><strong id="metric-std">—</strong
-                ><small>Popülasyon dağılımı</small>
-              </article>
-              <article>
-                <span>ÖLÇÜM ALANI</span><strong id="metric-area">—</strong
-                ><small id="area-unit">mm²</small>
-              </article>
-              <article>
-                <span>PİKSEL SAYISI</span><strong id="metric-count">—</strong
-                ><small>Kenar payı uygulanmış</small>
-              </article>
-            </div>
-            <section class="card table-card">
-              <div class="section-title">
-                <span class="number">03</span>
-                <h2>Kesit bazında ölçümler</h2>
-                <span class="table-unit" id="table-unit"></span>
-              </div>
-              <div class="table-scroll">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Ölçüm alanı</th>
-                      <th>Piksel</th>
-                      <th>Alan (mm²)</th>
-                      <th>Ort.</th>
-                      <th>Std.</th>
-                      <th>Medyan</th>
-                      <th>Min.</th>
-                      <th>Maks.</th>
-                      <th>%5</th>
-                      <th>%95</th>
-                    </tr>
-                  </thead>
-                  <tbody id="measurements"></tbody>
-                </table>
-              </div>
-              <p class="quiet table-note">
-                İlk satır, kenar payı çıkarılmış numune alanıdır. Yüzdelikler
-                doğrusal enterpolasyonla hesaplanır.
-              </p>
-            </section>
-            <div class="bottom-grid">
-              <section class="card">
-                <div class="section-title">
-                  <h2>Yoğunluk dağılımı</h2>
-                  <span class="badge subtle">NUMUNE</span>
-                </div>
-                <canvas
-                  id="histogram"
-                  aria-label="Numune yoğunluk histogramı"
-                  role="img"
-                ></canvas>
-                <p class="quiet">
-                  X: yoğunluk · Y: piksel sayısı. Çubukların üzerine gelerek
-                  aralığı inceleyin.
-                </p>
-                <div
-                  id="histogram-detail"
-                  class="hist-detail"
-                  aria-live="polite"
-                >
-                  —
-                </div>
-              </section>
-              <section class="card">
-                <div class="section-title"><h2>Bölgesel ortalamalar</h2></div>
-                <div id="regions" class="region-list"></div>
-                <p class="quiet">
-                  Merkez bölgeleri, kenar payı uygulanmış yarıçap üzerinden
-                  hesaplanır.
-                </p>
-              </section>
-            </div>
-            <section class="card">
-              <details id="metadata-details">
-                <summary>Kaynak ve ölçüm bilgileri <span>+</span></summary>
-                <dl id="metadata"></dl>
-              </details>
-            </section>
-          </div>
-          <section id="intro" class="intro">
-            <div class="intro-heading">
-              <h2>Ölçümden rapora, tek çalışma alanı.</h2>
-              <p>Yüklediğiniz kesit üzerinden hesaplanır.</p>
-            </div>
-            <div class="intro-features">
-              <p>
-                <span>01</span><b>Alan kontrolü</b>Otomatik öneri veya elle
-                seçim
-              </p>
-              <p>
-                <span>02</span><b>Yoğunluk analizi</b>İstatistikler ve bölgesel
-                dağılım
-              </p>
-              <p>
-                <span>03</span><b>Excel raporu</b>Dört sayfalı ölçüm çıktısı
-              </p>
-            </div>
           </section>
-        </div>
+        </form>
       </div>
       <footer>
         <span>HUReader <b>/</b> Kesit analiz çalışma alanı</span

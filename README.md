@@ -24,13 +24,14 @@ npm run start:prod
 
 ## Kullanım
 
-1. PNG, JPG veya tek kesitli CT DICOM yükleyin.
-2. Gerekirse piksel boyutunu ve kenar payını belirtin.
-3. **Kesiti analiz et** düğmesine basın.
-4. Kesikli turuncu numune sınırını ve yeşil ölçüm alanını kontrol edin. Otomatik seçim bir öneridir. Elle seçim seçeneğiyle X/Y merkezi ve yarıçapı değiştirin; görüntüye tıklayarak merkezi taşıyabilirsiniz. Değişikliklerden sonra yeniden analiz edin.
-5. Sonuçları inceleyin ve **Excel raporunu indir** ile dört sayfalı raporu alın.
+1. **Görüntü yükle:** PNG, JPG veya tek kesitli CT DICOM seçin. **Ölçüm ayarlarına geç** ile ikinci aşamayı açın.
+2. **Ölçüm alanını incele:** Gerekirse piksel boyutunu ve kenar payını belirtin, ardından **Ölçümü hesapla** düğmesine basın.
+3. Kesikli turuncu numune sınırını ve yeşil ölçüm alanını kontrol edin. Otomatik seçim bir öneridir. Elle seçimle X/Y merkezi ve yarıçapı değiştirin; görüntüye tıklayarak merkezi taşıyabilirsiniz. Değişikliklerden sonra yeniden hesaplayın.
+4. **Alanı doğrula ve sonuçlara geç** ile üçüncü aşamayı açın. Ölçüm tablolarını ve histogramı inceleyin, **Excel raporunu indir** ile dört sayfalı raporu alın.
 
-Üstteki aşama göstergesi yükleme, ölçüm ve raporlama durumunu takip eder. Önizlemedeki tam ekran düğmesiyle kesiti büyütebilir, **Kullanım rehberi** düğmesiyle kısa açıklamaları açabilirsiniz. Ölçüm notları sonuçlar bölümünde açılıp kapatılabilir. Arayüz masaüstü ve mobil ekranlara uyarlanır.
+Üstteki sekmeler ve geri düğmeleriyle önceki aşamalara dönebilirsiniz. Aynı dosya için ayarlar korunur. Dosya seçilmeden ikinci, başarılı hesaplama yapılmadan üçüncü aşama açılmaz. Ölçüm ayarları değişirse rapor aşaması yeniden hesaplamaya kadar kilitlenir. Yeni dosya seçmek eski sonuçları ve eski çember koordinatlarını sıfırlar.
+
+Sekmeler sol/sağ ok, Home ve End tuşlarıyla kullanılabilir. Önizlemedeki tam ekran düğmesiyle kesiti büyütebilir, **Kullanım rehberi** düğmesiyle kısa açıklamaları açabilirsiniz. Ölçüm notları sonuçlar bölümünde açılıp kapatılabilir. Arayüz masaüstü ve mobil ekranlara uyarlanır.
 
 ## Ölçümler
 

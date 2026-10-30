@@ -7,6 +7,8 @@ let analyzedBody = null;
 let previewImage = null;
 let currentPreviewUrl = null;
 let busy = false;
+let currentStep = 1;
+let resultDirty = true;
 const fmt = (value, decimals = 1) =>
   value === null || value === undefined
     ? '—'
@@ -26,20 +28,81 @@ function showError(message) {
   $('#error').textContent = message;
   $('#error').hidden = false;
 }
-function setWorkflow(step) {
+function syncWorkflow() {
   ['upload', 'analyze', 'report'].forEach((name, index) => {
-    const item = $(`#step-${name}`);
-    item.classList.toggle('active', index === step - 1);
-    item.classList.toggle('complete', index < step - 1);
-    if (index === step - 1) item.setAttribute('aria-current', 'step');
-    else item.removeAttribute('aria-current');
+    const step = index + 1;
+    const tab = $(`#step-${name}`);
+    const allowed =
+      step === 1 ||
+      (step === 2 && file) ||
+      (step === 3 && result && !resultDirty);
+    tab.disabled = busy || !allowed;
+    tab.classList.toggle('active', currentStep === step);
+    tab.classList.toggle(
+      'complete',
+      step === 1
+        ? !!file && currentStep > 1
+        : step === 2 && !!result && !resultDirty && currentStep === 3,
+    );
+    tab.setAttribute('aria-selected', String(currentStep === step));
+    tab.tabIndex = currentStep === step ? 0 : -1;
+    $(`#panel-${name}`).hidden = currentStep !== step;
   });
+  $('#go-analyze').disabled = busy || !file;
+  $('#go-report').disabled = busy || !result || resultDirty;
+  $('#export').disabled = busy || !result || resultDirty;
+  $('#review-ready').hidden = !result || resultDirty;
+  for (const button of document.querySelectorAll('[data-step]'))
+    button.disabled = busy;
 }
+function setWorkflow(step, focus = false) {
+  if (busy || (step === 2 && !file) || (step === 3 && (!result || resultDirty)))
+    return;
+  currentStep = step;
+  syncWorkflow();
+  if (step === 3) requestAnimationFrame(drawHistogram);
+  if (focus) {
+    $(`#panel-${['upload', 'analyze', 'report'][step - 1]}`).focus({
+      preventScroll: true,
+    });
+    if ($('.wizard-navigation').getBoundingClientRect().top < 0)
+      $('.wizard-navigation').scrollIntoView({ block: 'start' });
+  }
+}
+['upload', 'analyze', 'report'].forEach((name, index) => {
+  $(`#step-${name}`).addEventListener('click', () =>
+    setWorkflow(index + 1, true),
+  );
+});
+$('.workflow').addEventListener('keydown', (event) => {
+  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+  const tabs = [...document.querySelectorAll('.workflow [role=tab]')].filter(
+    (tab) => !tab.disabled,
+  );
+  if (!tabs.length) return;
+  event.preventDefault();
+  let index = tabs.indexOf(document.activeElement);
+  if (event.key === 'Home') index = 0;
+  else if (event.key === 'End') index = tabs.length - 1;
+  else
+    index =
+      (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) %
+      tabs.length;
+  tabs[index].click();
+  tabs[index].focus();
+});
+$('#go-analyze').addEventListener('click', () => setWorkflow(2, true));
+$('#go-report').addEventListener('click', () => setWorkflow(3, true));
+for (const button of document.querySelectorAll('[data-step]'))
+  button.addEventListener('click', () =>
+    setWorkflow(Number(button.dataset.step), true),
+  );
 function dirty() {
+  resultDirty = true;
+  syncWorkflow();
   if (result) {
-    setWorkflow(2);
     $('#status').textContent =
-      'Ayarlar değişti. Görünen sonuçlar önceki analize aittir; yeni ölçüm için tekrar analiz edin.';
+      'Ayarlar değişti. Sonuçlara geçmeden önce ölçümü yeniden hesaplayın.';
     $('#status').hidden = false;
     $('#export').disabled = true;
   }
@@ -73,12 +136,24 @@ function chooseFile(selected) {
   $('#error').hidden = true;
   if (selected.size > 20 * 1024 * 1024) {
     showError('Dosya 20 MB sınırını aşıyor.');
-    fileInput.value = '';
+    if (file) {
+      const previous = new DataTransfer();
+      previous.items.add(file);
+      fileInput.files = previous.files;
+    } else fileInput.value = '';
     return;
   }
   file = selected;
   result = null;
   analyzedBody = null;
+  resultDirty = true;
+  $('#manual').checked = false;
+  $('#canvas-hint').hidden = true;
+  for (const key of ['centerX', 'centerY', 'radius']) {
+    form.elements[key].value = '';
+    form.elements[key].disabled = true;
+    form.elements[key].required = false;
+  }
   $('#file-label').textContent = selected.name;
   $('#file-info').hidden = false;
   $('#file-type').textContent = selected.name
@@ -88,12 +163,15 @@ function chooseFile(selected) {
     .slice(0, 8);
   $('#file-size').textContent = `${fmt(selected.size / 1024 / 1024, 2)} MB`;
   $('#dropzone').classList.add('has-file');
-  setWorkflow(2);
+  syncWorkflow();
+  $('#upload-guidance').textContent =
+    'Görüntü seçildi. Ölçüm ayarlarıyla devam edebilirsiniz.';
+  $('#selected-file-name').textContent = selected.name;
+  $('#report-file-name').textContent = selected.name;
   $('#image-title').textContent = selected.name;
   $('#image-badge').textContent = 'Analize hazır';
   $('#dimensions').textContent = '— × — px';
   $('#results').hidden = true;
-  $('#intro').hidden = false;
   $('#status').hidden = true;
   if (currentPreviewUrl) {
     URL.revokeObjectURL(currentPreviewUrl);
@@ -157,7 +235,14 @@ function drawPreview() {
         radius: Number(form.elements.radius.value),
       }
     : result?.roi;
-  if (!roi || !roi.radius) return;
+  if (
+    !roi ||
+    !Number.isFinite(roi.radius) ||
+    roi.radius <= 0 ||
+    !Number.isFinite(roi.x) ||
+    !Number.isFinite(roi.y)
+  )
+    return;
   const inset =
     form.elements.insetPixels.value !== ''
       ? Number(form.elements.insetPixels.value)
@@ -211,8 +296,9 @@ function setBusy(value) {
   fileInput.disabled = value;
   $('#analyze span:first-child').textContent = value
     ? 'Kesit inceleniyor…'
-    : 'Kesiti analiz et';
+    : 'Ölçümü hesapla';
   form.setAttribute('aria-busy', String(value));
+  syncWorkflow();
   // Preserve the current field disabled state while a request is in progress.
   for (const input of form.querySelectorAll('input:not([type=file])')) {
     if (value) {
@@ -229,11 +315,17 @@ async function readError(response) {
 }
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
+  if (busy) return;
+  if (currentStep === 1 && file) {
+    setWorkflow(2, true);
+    return;
+  }
   if (!file) {
     showError('Önce bir kesit dosyası seçin.');
     return;
   }
   const body = requestBody();
+  resultDirty = true;
   setBusy(true);
   $('#error').hidden = true;
   $('#status').hidden = false;
@@ -244,6 +336,7 @@ form.addEventListener('submit', async (event) => {
     if (!response.ok) throw new Error(await readError(response));
     result = await response.json();
     analyzedBody = body;
+    resultDirty = false;
     renderResults();
     $('#status').hidden = true;
   } catch (error) {
@@ -251,7 +344,7 @@ form.addEventListener('submit', async (event) => {
     $('#status').hidden = true;
     if (result) {
       $('#status').textContent =
-        'Analiz başarısız oldu. Önceki sonuçlar gösteriliyor.';
+        'Ölçüm tamamlanamadı. Ayarları kontrol edip tekrar hesaplayın; rapor adımı henüz kullanılamıyor.';
       $('#status').hidden = false;
     }
   } finally {
@@ -260,10 +353,9 @@ form.addEventListener('submit', async (event) => {
   }
 });
 function renderResults() {
-  setWorkflow(3);
+  syncWorkflow();
   $('#warning-count').textContent = result.warnings.length;
   $('#results').hidden = false;
-  $('#intro').hidden = true;
   $('#image-badge').textContent = unitLabel(result.unit);
   $('#image-title').textContent = result.filename;
   for (const [name, value] of Object.entries({
@@ -342,7 +434,7 @@ function renderResults() {
   drawHistogram();
 }
 function drawHistogram() {
-  if (!result) return;
+  if (!result || $('#panel-report').hidden) return;
   const canvas = $('#histogram'),
     ratio = window.devicePixelRatio || 1;
   const w = canvas.clientWidth,
@@ -394,7 +486,7 @@ $('#histogram').addEventListener('mousemove', (event) => {
 });
 window.addEventListener('resize', drawHistogram);
 $('#export').addEventListener('click', async () => {
-  if (!analyzedBody || busy) return;
+  if (!analyzedBody || busy || resultDirty) return;
   setBusy(true);
   $('#export').textContent = 'Rapor hazırlanıyor…';
   try {
@@ -450,3 +542,5 @@ document.addEventListener('fullscreenchange', () => {
   $('#expand-preview').setAttribute('aria-label', label);
   $('#expand-preview').title = label;
 });
+
+syncWorkflow();
