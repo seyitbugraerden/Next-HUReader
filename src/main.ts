@@ -7,6 +7,10 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.enableShutdownHooks();
   app.useStaticAssets(join(import.meta.dirname, '..', 'public'));
+  app.useStaticAssets(
+    join(import.meta.dirname, '..', 'node_modules', 'exceljs', 'dist'),
+    { prefix: '/vendor/' },
+  );
   await app.listen(process.env.PORT ?? 3000);
 }
 await bootstrap();

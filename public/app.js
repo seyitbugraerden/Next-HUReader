@@ -9,6 +9,215 @@ let currentPreviewUrl = null;
 let busy = false;
 let currentStep = 1;
 let resultDirty = true;
+let entries = [];
+let activeId = null;
+const optionNames = [
+  'centerX',
+  'centerY',
+  'radius',
+  'insetPixels',
+  'spacingX',
+  'spacingY',
+  'windowMin',
+  'windowMax',
+];
+const activeEntry = () => entries.find((entry) => entry.id === activeId);
+const readyEntries = () =>
+  entries.filter((entry) => entry.result && !entry.dirty);
+function captureSettings() {
+  return {
+    manual: $('#manual').checked,
+    estimate: $('#estimate').checked,
+    values: Object.fromEntries(
+      optionNames.map((key) => [key, form.elements[key].value]),
+    ),
+  };
+}
+function saveCurrent() {
+  const entry = activeEntry();
+  if (entry)
+    Object.assign(entry, {
+      result,
+      dirty: resultDirty,
+      body: analyzedBody,
+      settings: captureSettings(),
+    });
+}
+function applySettings(settings) {
+  $('#manual').checked = settings.manual;
+  $('#estimate').checked = settings.estimate;
+  for (const key of optionNames)
+    form.elements[key].value = settings.values[key] ?? '';
+  for (const key of ['centerX', 'centerY', 'radius']) {
+    form.elements[key].disabled = !settings.manual;
+    form.elements[key].required = settings.manual;
+  }
+  for (const key of ['windowMin', 'windowMax']) {
+    form.elements[key].disabled = !settings.estimate;
+    form.elements[key].required = settings.estimate;
+  }
+  $('#canvas-hint').hidden = !settings.manual;
+}
+function entryStatus(entry) {
+  return entry.processing
+    ? 'İşleniyor'
+    : entry.error
+      ? 'Hata'
+      : entry.result && !entry.dirty
+        ? 'Hesaplandı'
+        : entry.result
+          ? 'Yeniden hesaplanmalı'
+          : 'Bekliyor';
+}
+function renderQueue() {
+  $('#queue-card').hidden = !entries.length;
+  $('#queue-count').textContent = `${entries.length} dosya`;
+  $('#upload-guidance').textContent = entries.length
+    ? 'Dosyalar seçildi. Her dosya için ölçüm ayarlarıyla devam edebilirsiniz.'
+    : 'Devam etmek için bir görüntü seçin.';
+  $('#file-info').hidden = !entries.length;
+  $('#file-type').textContent = `${entries.length} DOSYA`;
+  $('#file-size').textContent =
+    `${fmt(entries.reduce((total, e) => total + e.file.size, 0) / 1024 / 1024, 2)} MB`;
+  $('#file-label').textContent = entries.length
+    ? `${entries.length} dosya seçildi · Daha fazla ekleyin`
+    : 'Görüntüleri sürükleyip bırakın';
+  $('#file-queue').replaceChildren(
+    ...entries.map((entry) => {
+      const row = document.createElement('div');
+      row.className = 'queue-row';
+      const name = document.createElement('span');
+      name.className = 'queue-name';
+      name.textContent = entry.file.name;
+      const status = document.createElement('span');
+      status.className = `queue-state ${entry.error ? 'has-error' : entry.result && !entry.dirty ? 'is-ready' : ''}`;
+      status.textContent = entryStatus(entry);
+      status.title = entry.error || '';
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'icon-button';
+      remove.textContent = '×';
+      remove.disabled = busy;
+      remove.setAttribute('aria-label', `${entry.file.name} dosyasını kaldır`);
+      remove.addEventListener('click', () => removeEntry(entry.id));
+      row.append(name, status, remove);
+      return row;
+    }),
+  );
+  for (const [id, list] of [
+    ['#active-file', entries],
+    ['#report-active-file', readyEntries()],
+  ]) {
+    const select = $(id);
+    select.replaceChildren(
+      ...list.map((entry) => {
+        const option = document.createElement('option');
+        option.value = entry.id;
+        option.textContent = `${entries.indexOf(entry) + 1}. ${entry.file.name} — ${entryStatus(entry)}`;
+        return option;
+      }),
+    );
+    select.value = activeId;
+    select.disabled = busy || !list.length;
+  }
+  const ready = readyEntries().length,
+    errors = entries.filter((e) => e.error).length;
+  $('#batch-counts').textContent =
+    `${ready}/${entries.length} hesaplandı${errors ? ` · ${errors} hata` : ''}`;
+  $('#batch-report-note').textContent =
+    `${ready} dosyanın güncel ölçümleri rapora dahil edilir. ${entries.length - ready} dosya hatalı, bekliyor veya yeniden hesaplanmalı. Her ölçüm alanını ilgili dosyada kontrol edin.`;
+  $('#batch-measurements').replaceChildren(
+    ...entries.map((entry) => {
+      const row = document.createElement('tr'),
+        valid = entry.result && !entry.dirty,
+        m = valid ? entry.result.measurements[0] : null;
+      for (const value of [
+        entry.file.name,
+        entryStatus(entry),
+        valid ? unitLabel(entry.result.unit) : '—',
+        fmt(m?.mean),
+        fmt(m?.std),
+        m ? integer(m.count) : '—',
+      ]) {
+        const td = document.createElement('td');
+        td.textContent = value;
+        row.append(td);
+      }
+      row.title = entry.error || '';
+      return row;
+    }),
+  );
+}
+function selectEntry(id, save = true) {
+  if (save) saveCurrent();
+  activeId = id;
+  const entry = activeEntry();
+  file = entry?.file ?? null;
+  result = entry?.result ?? null;
+  resultDirty = entry?.dirty ?? true;
+  analyzedBody = entry?.body ?? null;
+  applySettings(
+    entry?.settings ?? { manual: false, estimate: false, values: {} },
+  );
+  $('#error').hidden = true;
+  $('#status').hidden = true;
+  if (entry?.error) showError(entry.error);
+  else if (entry?.result && entry.dirty) {
+    $('#status').hidden = false;
+    $('#status').textContent =
+      'Bu dosyanın ayarları değişti. Güncel sonuçlar için yeniden hesaplayın.';
+  }
+  if (currentPreviewUrl) {
+    URL.revokeObjectURL(currentPreviewUrl);
+    currentPreviewUrl = null;
+  }
+  previewImage = null;
+  $('#image-canvas').hidden = true;
+  $('#empty').hidden = false;
+  $('#dimensions').textContent = '— × — px';
+  $('#image-title').textContent = file?.name ?? 'Görüntü önizlemesi';
+  $('#selected-file-name').textContent = file?.name ?? '—';
+  $('#report-file-name').textContent = file?.name ?? '—';
+  $('#image-badge').textContent = result
+    ? unitLabel(result.unit)
+    : file
+      ? 'Analize hazır'
+      : 'Görüntü bekleniyor';
+  $('#results').hidden = !result;
+  if (result) {
+    renderResults(false);
+  } else if (
+    file &&
+    (/\.(png|jpe?g)$/i.test(file.name) || /image\/(png|jpeg)/.test(file.type))
+  ) {
+    currentPreviewUrl = URL.createObjectURL(file);
+    loadPreview(currentPreviewUrl);
+  }
+  syncWorkflow();
+}
+function removeEntry(id) {
+  if (busy) return;
+  $('#batch-progress').hidden = true;
+  saveCurrent();
+  entries = entries.filter((entry) => entry.id !== id);
+  if (activeId === id)
+    selectEntry(
+      (currentStep === 3 ? readyEntries()[0]?.id : null) ??
+        entries[0]?.id ??
+        null,
+      false,
+    );
+  if (currentStep === 3 && !readyEntries().length)
+    currentStep = entries.length ? 2 : 1;
+  if (!entries.length) currentStep = 1;
+  syncWorkflow();
+}
+$('#active-file').addEventListener('change', (event) =>
+  selectEntry(event.target.value),
+);
+$('#report-active-file').addEventListener('change', (event) =>
+  selectEntry(event.target.value),
+);
 const fmt = (value, decimals = 1) =>
   value === null || value === undefined
     ? '—'
@@ -29,13 +238,13 @@ function showError(message) {
   $('#error').hidden = false;
 }
 function syncWorkflow() {
+  saveCurrent();
+  const hasReady = readyEntries().length > 0;
   ['upload', 'analyze', 'report'].forEach((name, index) => {
     const step = index + 1;
     const tab = $(`#step-${name}`);
     const allowed =
-      step === 1 ||
-      (step === 2 && file) ||
-      (step === 3 && result && !resultDirty);
+      step === 1 || (step === 2 && entries.length) || (step === 3 && hasReady);
     tab.disabled = busy || !allowed;
     tab.classList.toggle('active', currentStep === step);
     tab.classList.toggle(
@@ -48,16 +257,24 @@ function syncWorkflow() {
     tab.tabIndex = currentStep === step ? 0 : -1;
     $(`#panel-${name}`).hidden = currentStep !== step;
   });
-  $('#go-analyze').disabled = busy || !file;
-  $('#go-report').disabled = busy || !result || resultDirty;
+  $('#go-analyze').disabled = busy || !entries.length;
+  $('#go-report').disabled = busy || !hasReady;
+  $('#analyze-all').disabled = busy || !entries.length;
+  $('#export-batch').disabled = busy || !hasReady;
   $('#export').disabled = busy || !result || resultDirty;
   $('#review-ready').hidden = !result || resultDirty;
   for (const button of document.querySelectorAll('[data-step]'))
     button.disabled = busy;
+  renderQueue();
 }
 function setWorkflow(step, focus = false) {
-  if (busy || (step === 2 && !file) || (step === 3 && (!result || resultDirty)))
+  if (
+    busy ||
+    (step === 2 && !entries.length) ||
+    (step === 3 && !readyEntries().length)
+  )
     return;
+  if (step === 3 && (!result || resultDirty)) selectEntry(readyEntries()[0].id);
   currentStep = step;
   syncWorkflow();
   if (step === 3) requestAnimationFrame(drawHistogram);
@@ -99,6 +316,8 @@ for (const button of document.querySelectorAll('[data-step]'))
   );
 function dirty() {
   resultDirty = true;
+  $('#batch-progress').hidden = true;
+  if (activeEntry()) activeEntry().error = null;
   syncWorkflow();
   if (result) {
     $('#status').textContent =
@@ -126,69 +345,47 @@ $('#estimate').addEventListener('change', () => {
   dirty();
 });
 form.addEventListener('input', (event) => {
-  if (event.target !== fileInput) {
+  if (event.target.matches('input:not([type=file])')) {
     dirty();
     drawPreview();
   }
 });
-function chooseFile(selected) {
-  if (!selected) return;
-  $('#error').hidden = true;
-  if (selected.size > 20 * 1024 * 1024) {
-    showError('Dosya 20 MB sınırını aşıyor.');
-    if (file) {
-      const previous = new DataTransfer();
-      previous.items.add(file);
-      fileInput.files = previous.files;
-    } else fileInput.value = '';
-    return;
+function chooseFiles(files) {
+  if (busy) return;
+  $('#batch-progress').hidden = true;
+  saveCurrent();
+  const rejected = [];
+  let firstAdded = null;
+  for (const selected of files) {
+    if (selected.size > 20 * 1024 * 1024) {
+      rejected.push(selected.name);
+      continue;
+    }
+    const entry = {
+      id: crypto.randomUUID(),
+      file: selected,
+      result: null,
+      dirty: true,
+      body: null,
+      error: null,
+      processing: false,
+      settings: { manual: false, estimate: false, values: {} },
+    };
+    entries.push(entry);
+    firstAdded ??= entry.id;
   }
-  file = selected;
-  result = null;
-  analyzedBody = null;
-  resultDirty = true;
-  $('#manual').checked = false;
-  $('#canvas-hint').hidden = true;
-  for (const key of ['centerX', 'centerY', 'radius']) {
-    form.elements[key].value = '';
-    form.elements[key].disabled = true;
-    form.elements[key].required = false;
-  }
-  $('#file-label').textContent = selected.name;
-  $('#file-info').hidden = false;
-  $('#file-type').textContent = selected.name
-    .split('.')
-    .at(-1)
-    .toUpperCase()
-    .slice(0, 8);
-  $('#file-size').textContent = `${fmt(selected.size / 1024 / 1024, 2)} MB`;
-  $('#dropzone').classList.add('has-file');
+  if (!activeEntry() && firstAdded) selectEntry(firstAdded, false);
+  $('#upload-guidance').textContent = entries.length
+    ? 'Dosyalar seçildi. Her dosya için ölçüm ayarlarıyla devam edebilirsiniz.'
+    : 'Devam etmek için bir görüntü seçin.';
+  fileInput.value = '';
   syncWorkflow();
-  $('#upload-guidance').textContent =
-    'Görüntü seçildi. Ölçüm ayarlarıyla devam edebilirsiniz.';
-  $('#selected-file-name').textContent = selected.name;
-  $('#report-file-name').textContent = selected.name;
-  $('#image-title').textContent = selected.name;
-  $('#image-badge').textContent = 'Analize hazır';
-  $('#dimensions').textContent = '— × — px';
-  $('#results').hidden = true;
-  $('#status').hidden = true;
-  if (currentPreviewUrl) {
-    URL.revokeObjectURL(currentPreviewUrl);
-    currentPreviewUrl = null;
-  }
-  previewImage = null;
-  $('#image-canvas').hidden = true;
-  $('#empty').hidden = false;
-  if (
-    /\.(png|jpe?g)$/i.test(selected.name) ||
-    /image\/(png|jpeg)/.test(selected.type)
-  ) {
-    currentPreviewUrl = URL.createObjectURL(selected);
-    loadPreview(currentPreviewUrl);
-  }
+  if (rejected.length)
+    showError(
+      `Dosya başına 20 MB sınırını aşan dosyalar eklenmedi: ${rejected.join(', ')}`,
+    );
 }
-fileInput.addEventListener('change', () => chooseFile(fileInput.files[0]));
+fileInput.addEventListener('change', () => chooseFiles(fileInput.files));
 for (const name of ['dragenter', 'dragover'])
   $('#dropzone').addEventListener(name, (event) => {
     event.preventDefault();
@@ -198,15 +395,7 @@ for (const name of ['dragleave', 'drop'])
   $('#dropzone').addEventListener(name, (event) => {
     event.preventDefault();
     $('#dropzone').classList.remove('drag');
-    if (name === 'drop' && !busy) {
-      const files = event.dataTransfer.files;
-      if (files.length !== 1) {
-        showError('Bir seferde tek bir kesit yükleyin.');
-        return;
-      }
-      fileInput.files = files;
-      chooseFile(files[0]);
-    }
+    if (name === 'drop' && !busy) chooseFiles(event.dataTransfer.files);
   });
 function loadPreview(url) {
   const image = new Image();
@@ -326,6 +515,8 @@ form.addEventListener('submit', async (event) => {
   }
   const body = requestBody();
   resultDirty = true;
+  activeEntry().error = null;
+  activeEntry().processing = true;
   setBusy(true);
   $('#error').hidden = true;
   $('#status').hidden = false;
@@ -337,9 +528,11 @@ form.addEventListener('submit', async (event) => {
     result = await response.json();
     analyzedBody = body;
     resultDirty = false;
+    activeEntry().error = null;
     renderResults();
     $('#status').hidden = true;
   } catch (error) {
+    activeEntry().error = error.message;
     showError(error.message);
     $('#status').hidden = true;
     if (result) {
@@ -348,22 +541,24 @@ form.addEventListener('submit', async (event) => {
       $('#status').hidden = false;
     }
   } finally {
+    activeEntry().processing = false;
     setBusy(false);
     if (!analyzedBody || !$('#error').hidden) $('#export').disabled = true;
   }
 });
-function renderResults() {
+function renderResults(updateCoordinates = true) {
   syncWorkflow();
   $('#warning-count').textContent = result.warnings.length;
   $('#results').hidden = false;
   $('#image-badge').textContent = unitLabel(result.unit);
   $('#image-title').textContent = result.filename;
-  for (const [name, value] of Object.entries({
-    centerX: result.roi.x,
-    centerY: result.roi.y,
-    radius: result.roi.radius,
-  }))
-    form.elements[name].value = value.toFixed(3);
+  if (updateCoordinates)
+    for (const [name, value] of Object.entries({
+      centerX: result.roi.x,
+      centerY: result.roi.y,
+      radius: result.roi.radius,
+    }))
+      form.elements[name].value = value.toFixed(3);
   loadPreview(result.preview);
   const m = result.measurements[0];
   $('#metric-mean').textContent = fmt(m.mean);
@@ -543,4 +738,111 @@ document.addEventListener('fullscreenchange', () => {
   $('#expand-preview').title = label;
 });
 
+function bodyForEntry(entry) {
+  const missing = (keys) =>
+    keys.some(
+      (key) =>
+        entry.settings.values[key] === undefined ||
+        entry.settings.values[key] === '' ||
+        !Number.isFinite(Number(entry.settings.values[key])),
+    );
+  if (entry.settings.manual && missing(['centerX', 'centerY', 'radius']))
+    throw new Error(
+      'Elle ölçüm için merkez X, merkez Y ve yarıçapı birlikte girin.',
+    );
+  if (entry.settings.estimate && missing(['windowMin', 'windowMax']))
+    throw new Error(
+      'Yaklaşık HU için pencere alt ve üst sınırını birlikte girin.',
+    );
+  const body = new FormData();
+  body.set('file', entry.file);
+  for (const key of optionNames) {
+    if (
+      ['centerX', 'centerY', 'radius'].includes(key) &&
+      !entry.settings.manual
+    )
+      continue;
+    if (['windowMin', 'windowMax'].includes(key) && !entry.settings.estimate)
+      continue;
+    if (
+      entry.settings.values[key] !== undefined &&
+      entry.settings.values[key] !== ''
+    )
+      body.set(key, entry.settings.values[key]);
+  }
+  return body;
+}
+$('#analyze-all').addEventListener('click', async () => {
+  if (busy || !entries.length) return;
+  saveCurrent();
+  const pending = entries.filter((entry) => !entry.result || entry.dirty);
+  if (!pending.length) {
+    $('#batch-progress').hidden = false;
+    $('#batch-progress').textContent =
+      'Tüm dosyaların güncel ölçümleri zaten hazır.';
+    return;
+  }
+  const selected = activeId;
+  setBusy(true);
+  $('#error').hidden = true;
+  $('#status').hidden = true;
+  $('#batch-progress').hidden = false;
+  try {
+    for (const [index, entry] of pending.entries()) {
+      entry.processing = true;
+      entry.error = null;
+      $('#batch-progress').textContent =
+        `${index + 1}/${pending.length} işleniyor · ${entry.file.name}`;
+      renderQueue();
+      try {
+        const body = bodyForEntry(entry);
+        const response = await fetch('/api/analyze', { method: 'POST', body });
+        if (!response.ok) throw new Error(await readError(response));
+        entry.result = await response.json();
+        entry.body = body;
+        entry.dirty = false;
+        for (const [key, value] of Object.entries({
+          centerX: entry.result.roi.x,
+          centerY: entry.result.roi.y,
+          radius: entry.result.roi.radius,
+        }))
+          entry.settings.values[key] = value.toFixed(3);
+      } catch (error) {
+        entry.error = error.message;
+        entry.dirty = true;
+      }
+      entry.processing = false;
+    }
+  } finally {
+    // Loading the selected entry must not overwrite it with the old view aliases.
+    selectEntry(selected, false);
+    setBusy(false);
+    $('#batch-progress').textContent =
+      `İşlem tamamlandı: ${readyEntries().length}/${entries.length} hesaplandı · ${entries.filter((e) => e.error).length} hata. Dosyalar arasında geçerek ölçüm alanlarını kontrol edin.`;
+  }
+});
+$('#export-batch').addEventListener('click', async () => {
+  if (busy || !readyEntries().length) return;
+  saveCurrent();
+  setBusy(true);
+  $('#export-batch').textContent = 'Toplu rapor hazırlanıyor…';
+  try {
+    const buffer = await createBatchWorkbook(entries);
+    const url = URL.createObjectURL(
+      new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      }),
+    );
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'HUReader-toplu-rapor.xlsx';
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (error) {
+    showError(error.message);
+  } finally {
+    setBusy(false);
+    $('#export-batch').textContent = '↓ Toplu Excel indir';
+  }
+});
 syncWorkflow();
