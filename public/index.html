@@ -207,6 +207,17 @@
                     aria-live="polite"
                     hidden
                   ></div>
+                  <section class="queue-card" id="queue-card" hidden>
+                    <div class="section-title">
+                      <h2>Eklenen görseller</h2>
+                      <span id="queue-count" class="badge"></span>
+                    </div>
+                    <div
+                      id="file-queue"
+                      class="file-queue"
+                      aria-label="Analiz dosyaları"
+                    ></div>
+                  </section>
                   <div class="file-info" id="file-info" hidden>
                     <span class="file-type" id="file-type"></span
                     ><span id="file-size"></span
@@ -300,21 +311,6 @@
                 </ul>
               </div>
             </div>
-            <section class="card queue-card" id="queue-card" hidden>
-              <div class="section-title">
-                <h2>Seçilen dosyalar</h2>
-                <span id="queue-count" class="badge"></span>
-              </div>
-              <p class="quiet">
-                Yeni seçimler listeye eklenir. Her dosyanın ölçüm alanı ve
-                sonucu ayrı tutulur.
-              </p>
-              <div
-                id="file-queue"
-                class="file-queue"
-                aria-label="Analiz dosyaları"
-              ></div>
-            </section>
             <div class="wizard-actions">
               <p id="upload-guidance">Devam etmek için bir görüntü seçin.</p>
               <button id="go-analyze" class="primary" type="button" disabled>
@@ -345,8 +341,11 @@
                 >İncelenen dosya<select id="active-file"></select
               ></label>
               <div class="batch-actions">
-                <span id="batch-counts" class="quiet"></span
-                ><button id="analyze-all" class="secondary" type="button">
+                <span id="batch-counts" class="quiet"></span>
+                <button id="remove-active-file" class="file-clear" type="button">
+                  <span aria-hidden="true">×</span> Görseli kaldır
+                </button>
+                <button id="analyze-all" class="secondary" type="button">
                   Tüm dosyaları analiz et
                 </button>
               </div>

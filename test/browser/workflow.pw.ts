@@ -145,6 +145,13 @@ test('all uploaded images can be cancelled and workflow resets to upload', async
   await page.locator('#go-analyze').click();
   await expect(page.locator('#image-canvas')).toBeVisible();
 
+  const removedId = await page.locator('#active-file').inputValue();
+  await page.locator('#remove-active-file').click();
+  await expect(page.locator('#active-file option')).toHaveCount(1);
+  await expect(page.locator('#active-file')).not.toHaveValue(removedId);
+  await expect(page.locator('#image-canvas')).toBeVisible();
+
+  await page.locator('#panel-analyze [data-step="1"]').click();
   await page.locator('#clear-files').click();
 
   await expect(page.locator('.queue-row')).toHaveCount(0);
@@ -156,11 +163,49 @@ test('all uploaded images can be cancelled and workflow resets to upload', async
     'aria-selected',
     'true',
   );
+  await expect(page.locator('#panel-upload')).toBeVisible();
   await expect(page.locator('#image-canvas')).toBeHidden();
-  await expect(page.locator('#empty')).toBeVisible();
+  await expect
+    .poll(() => page.locator('#empty').evaluate((empty) => empty.hidden))
+    .toBe(false);
   await expect(page.locator('#file-label')).toHaveText(
     'Görüntüleri sürükleyip bırakın',
   );
+});
+
+test('uploaded images show previews and can be removed from their preview card', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.locator('#file').setInputFiles([
+    { name: 'first-slice.png', mimeType: 'image/png', buffer: await disk(80) },
+    { name: 'second-slice.png', mimeType: 'image/png', buffer: await disk(180) },
+  ]);
+  await settled(page);
+
+  const cards = page.locator('.queue-preview-card');
+  await expect(cards).toHaveCount(2);
+  await expect(page.locator('#queue-card')).toBeVisible();
+  await expect(page.locator('.upload-card #queue-card')).toBeVisible();
+  await expect(cards.nth(0).locator('.queue-name')).toHaveText(
+    'first-slice.png',
+  );
+  await expect(cards.nth(0).locator('.queue-name')).not.toHaveClass(/badge|file-type/);
+  await expect
+    .poll(() =>
+      cards.nth(0).locator('.queue-preview-image').evaluate(
+        (image: HTMLImageElement) => image.complete && image.naturalWidth > 0,
+      ),
+    )
+    .toBe(true);
+  await expect(cards.nth(0).getByRole('button', { name: 'first-slice.png dosyasını kaldır' })).toBeVisible();
+  await cards
+    .nth(0)
+    .getByRole('button', { name: 'first-slice.png dosyasını kaldır' })
+    .click();
+
+  await expect(page.locator('.queue-preview-card')).toHaveCount(1);
+  await expect(page.locator('.queue-name')).toHaveText('second-slice.png');
 });
 
 test('per-file geometry, calibration, stale results and both Excel reports remain consistent', async ({
@@ -325,6 +370,14 @@ test('extensionless DICOM can be previewed before a successful analysis', async 
     mimeType: 'application/octet-stream',
     buffer: dicomFixture(),
   });
+  await expect(page.locator('.queue-preview-image')).toHaveCount(1);
+  await expect
+    .poll(() =>
+      page.locator('.queue-preview-image').evaluate(
+        (image: HTMLImageElement) => image.complete && image.naturalWidth > 0,
+      ),
+    )
+    .toBe(true);
   await page.locator('#go-analyze').click();
   await expect(page.locator('#image-canvas')).toBeVisible();
   await expect(page.locator('#dimensions')).toHaveText('8 × 8 px');

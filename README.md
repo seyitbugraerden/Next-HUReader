@@ -24,7 +24,7 @@ npm run start:prod
 
 ## Kullanım
 
-1. **Görüntü yükle:** Bir veya birden fazla PNG, JPG veya tek kesitli CT DICOM seçin. **Klasör seç** düğmesiyle bir klasörü alt klasörleriyle birlikte de ekleyebilirsiniz. Yeni seçimler dosya kuyruğuna eklenir; dosyaları listeden ayrı ayrı kaldırabilirsiniz. **Ölçüm ayarlarına geç** ile ikinci aşamayı açın.
+1. **Görüntü yükle:** Bir veya birden fazla PNG, JPG veya tek kesitli CT DICOM seçin. **Klasör seç** düğmesiyle bir klasörü alt klasörleriyle birlikte de ekleyebilirsiniz. Kuyrukta görseller önizleme kartlarıyla gösterilir; kartın sağ üstündeki çöp kutusu ilgili görseli kaldırır. **Ölçüm ayarlarına geç** ile ikinci aşamayı açın.
 2. **Ölçüm alanını incele:** Dosya seçicisinden incelemek istediğiniz kesiti seçin. Gerekirse piksel boyutunu, kenar payını ve çemberi ayarlayın. **Ölçümü hesapla** yalnızca seçili dosyayı, **Tüm dosyaları analiz et** güncel sonucu olmayan dosyaları sırayla işler. Her dosya kendi ayarlarını korur; bir dosya hata verdiğinde sıradaki dosyaya geçilir.
 3. Kesikli turuncu numune sınırını ve yeşil ölçüm alanını kontrol edin. Otomatik seçim bir öneridir; sınır noktaları çembere yeterince uymuyorsa elle seçim istenir. Elle seçimle X/Y merkezi ve yarıçapı değiştirin; görüntüye tıklayarak merkezi taşıyabilirsiniz. Değişikliklerden sonra yeniden hesaplayın.
 4. **Sonuçlara geç** ile üçüncü aşamayı açın. En az bir güncel başarılı ölçüm varsa bu aşama kullanılabilir. Üstte tüm dosyaların durumu ve karşılaştırma tablosu, altta seçilen başarılı dosyanın ayrıntıları görünür. **Excel raporunu indir** seçilen dosyanın dört sayfalı raporunu, **Toplu Excel indir** tüm güncel başarılı sonuçların altı sayfalı raporunu üretir.

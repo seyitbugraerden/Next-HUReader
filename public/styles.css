@@ -1874,45 +1874,145 @@ dialog .primary {
 
 /* Independent files in a sequential analysis queue. */
 .queue-card {
-  margin: 12px 0 22px;
+  margin: 14px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid #ffffff20;
 }
 .queue-card .section-title {
   margin-bottom: 7px;
 }
+.queue-card .section-title h2 {
+  color: #e6f0f5;
+  font-size: 13px;
+}
 .queue-card .badge {
   margin-left: auto;
+  border-color: #ffffff20;
+  color: #c7e9e3;
+  background: #ffffff0d;
 }
 .file-queue {
-  margin-top: 16px;
-  max-height: 300px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+  max-height: 360px;
+  padding: 2px 3px 8px;
   overflow: auto;
 }
 .queue-row {
   display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 12px 0;
-  border-top: 1px solid var(--line);
+  min-width: 0;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+  padding: 0;
+  border: 0;
 }
 .queue-name {
-  flex: 1;
   min-width: 0;
+  padding: 1px 3px 0;
   overflow-wrap: anywhere;
   font-size: 12px;
-  color: #476477;
+  font-weight: 550;
+  color: #d3e1e9;
 }
 .queue-state {
   font-size: 10px;
-  color: #8999a8;
+  color: #a7bac7;
 }
 .queue-state.is-ready {
-  color: #138570;
+  color: #77dfbf;
 }
 .queue-state.has-error {
-  color: #b36753;
+  color: #ffaaa5;
 }
 .queue-row .icon-button {
   flex-shrink: 0;
+}
+.queue-preview-card .queue-state {
+  padding: 0 3px;
+}
+.queue-preview {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 1px solid #ffffff2b;
+  border-radius: 13px;
+  background:
+    radial-gradient(ellipse at 50% 30%, #304956, transparent 70%),
+    #1b2b3b;
+  box-shadow: inset 0 1px #fff;
+}
+.queue-preview-select {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  color: #587184;
+  background: transparent;
+  cursor: pointer;
+}
+.queue-preview-select:disabled {
+  cursor: wait;
+}
+.queue-preview-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 280ms ease;
+}
+.queue-preview-card:hover .queue-preview-image,
+.queue-preview-card.is-active .queue-preview-image {
+  transform: scale(1.035);
+}
+.queue-preview-placeholder {
+  padding: 12px;
+  color: #b6c8d6;
+  font-size: 10px;
+  text-align: center;
+}
+.queue-preview-placeholder.has-error {
+  color: #a64b51;
+}
+.queue-preview-remove {
+  position: absolute;
+  z-index: 1;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid #ffffffa6;
+  border-radius: 10px;
+  color: #fff;
+  background: #102033c9;
+  box-shadow: 0 3px 12px #0e1e2d38;
+  backdrop-filter: blur(8px);
+  transition:
+    color 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
+}
+.queue-preview-remove:hover:not(:disabled) {
+  color: #fff;
+  background: #c64048;
+  transform: translateY(-1px);
+}
+.queue-preview-remove .icon {
+  width: 17px;
+  height: 17px;
+}
+.queue-preview-card.is-active .queue-preview {
+  border-color: #67d2b9;
+  box-shadow: 0 0 0 2px #67d2b935;
 }
 .batch-toolbar {
   display: flex;
@@ -1950,6 +2050,9 @@ select {
   display: flex;
   align-items: center;
   gap: 16px;
+}
+.batch-actions .file-clear {
+  min-height: 38px;
 }
 .batch-actions .quiet {
   margin: 0;
@@ -1996,19 +2099,30 @@ select {
 }
 @media (max-width: 760px) {
   .queue-row {
-    gap: 10px;
+    gap: 5px;
   }
   .queue-state {
     font-size: 9px;
-    max-width: 90px;
+    max-width: none;
   }
   .batch-toolbar {
     padding: 16px;
     gap: 15px;
   }
+  @media (max-width: 420px) {
+    .file-queue {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+  }
   .batch-actions {
     width: 100%;
     justify-content: space-between;
+    gap: 8px;
+  }
+  .batch-actions .file-clear {
+    padding-inline: 8px;
+    font-size: 9px;
   }
   .batch-summary .secondary {
     width: 100%;
@@ -2177,7 +2291,6 @@ header {
 .upload-card,
 .upload-guide,
 .viewer-card,
-.queue-card,
 .batch-summary {
   transition:
     transform 220ms ease,
@@ -2187,21 +2300,19 @@ header {
 .upload-card:hover,
 .upload-guide:hover,
 .viewer-card:hover,
-.queue-card:hover,
 .batch-summary:hover {
   border-color: #cfdae6;
   box-shadow: 0 10px 28px #17243a0d;
   transform: translateY(-2px);
 }
-.queue-row {
+.queue-preview-card {
   transition:
-    background 180ms ease,
-    padding 180ms ease;
+    transform 180ms ease,
+    box-shadow 180ms ease;
 }
-.queue-row:hover {
-  background: #f7fafc;
-  padding-right: 8px;
-  padding-left: 8px;
+.queue-preview-card:hover {
+  box-shadow: 0 8px 18px #17243a12;
+  transform: translateY(-2px);
 }
 
 @keyframes header-enter {
@@ -2602,7 +2713,6 @@ main {
   border-color: #8bcfc5;
   background: #eef9f6;
 }
-.queue-card,
 .batch-summary {
   border-radius: 19px;
 }
@@ -2886,6 +2996,15 @@ footer {
   border-color: #ffaaaab0;
   color: #fff;
   background: #d84a4a45;
+}
+#panel-upload .import-summary {
+  padding: 9px 12px;
+  border-color: #32867c;
+  border-radius: 10px;
+  color: #a6e5d4;
+  background: #153c3c;
+  font-size: 11px;
+  line-height: 1.5;
 }
 #panel-upload .sidebar-note {
   margin: 14px 5px 0;

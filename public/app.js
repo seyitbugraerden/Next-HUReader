@@ -98,8 +98,50 @@ function renderQueue() {
     : 'Görüntüleri sürükleyip bırakın';
   $('#file-queue').replaceChildren(
     ...entries.map((entry) => {
-      const row = document.createElement('div');
-      row.className = 'queue-row';
+      const row = document.createElement('article');
+      row.className = 'queue-row queue-preview-card';
+      row.classList.toggle('is-active', entry.id === activeId);
+      const preview = document.createElement('div');
+      preview.className = 'queue-preview';
+      const select = document.createElement('button');
+      select.type = 'button';
+      select.className = 'queue-preview-select';
+      select.disabled = busy || importing;
+      select.setAttribute(
+        'aria-label',
+        `${entryLabel(entry)} görselini seç`,
+      );
+      select.addEventListener('click', () => selectEntry(entry.id));
+      if (entry.thumbnailUrl) {
+        const image = document.createElement('img');
+        image.className = 'queue-preview-image';
+        image.src = entry.thumbnailUrl;
+        image.alt = '';
+        image.loading = 'lazy';
+        select.append(image);
+      } else {
+        const placeholder = document.createElement('span');
+        placeholder.className = `queue-preview-placeholder${entry.thumbnailError ? ' has-error' : ''}`;
+        placeholder.textContent = entry.thumbnailError
+          ? 'Önizleme açılamadı'
+          : 'Önizleme hazırlanıyor';
+        select.append(placeholder);
+      }
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'queue-preview-remove';
+      remove.disabled = busy || importing;
+      remove.setAttribute(
+        'aria-label',
+        `${entryLabel(entry)} dosyasını kaldır`,
+      );
+      remove.title = 'Görseli kaldır';
+      remove.innerHTML =
+        '<svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg>';
+      remove.addEventListener('click', () => removeEntry(entry.id));
+      preview.append(remove, select);
+      if (entry.thumbnailErrorMessage)
+        select.title = entry.thumbnailErrorMessage;
       const name = document.createElement('span');
       name.className = 'queue-name';
       name.textContent = entryLabel(entry);
@@ -107,17 +149,7 @@ function renderQueue() {
       status.className = `queue-state ${entry.error && !entry.needsArea ? 'has-error' : entry.result && !entry.dirty ? 'is-ready' : ''}`;
       status.textContent = entryStatus(entry);
       status.title = entry.error || '';
-      const remove = document.createElement('button');
-      remove.type = 'button';
-      remove.className = 'icon-button';
-      remove.textContent = '×';
-      remove.disabled = busy || importing;
-      remove.setAttribute(
-        'aria-label',
-        `${entryLabel(entry)} dosyasını kaldır`,
-      );
-      remove.addEventListener('click', () => removeEntry(entry.id));
-      row.append(name, status, remove);
+      row.append(preview, name, status);
       return row;
     }),
   );
@@ -239,6 +271,12 @@ function removeEntry(id) {
   if (busy || importing) return;
   $('#batch-progress').hidden = true;
   saveCurrent();
+  const removed = entries.find((entry) => entry.id === id);
+  if (removed) {
+    removed.thumbnailController?.abort();
+    if (removed.thumbnailUrl?.startsWith('blob:'))
+      URL.revokeObjectURL(removed.thumbnailUrl);
+  }
   entries = entries.filter((entry) => entry.id !== id);
   if (activeId === id)
     selectEntry(
@@ -254,6 +292,11 @@ function removeEntry(id) {
 }
 function clearEntries() {
   if (busy || importing || !entries.length) return;
+  for (const entry of entries) {
+    entry.thumbnailController?.abort();
+    if (entry.thumbnailUrl?.startsWith('blob:'))
+      URL.revokeObjectURL(entry.thumbnailUrl);
+  }
   entries = [];
   currentStep = 1;
   $('#batch-progress').hidden = true;
@@ -262,6 +305,9 @@ function clearEntries() {
   selectEntry(null, false);
 }
 $('#clear-files').addEventListener('click', clearEntries);
+$('#remove-active-file').addEventListener('click', () => {
+  if (activeId) removeEntry(activeId);
+});
 $('#active-file').addEventListener('change', (event) =>
   selectEntry(event.target.value),
 );
@@ -319,6 +365,7 @@ function syncWorkflow() {
   );
   $('#go-report').disabled = busy || !hasReady;
   $('#analyze-all').disabled = busy || !entries.length;
+  $('#remove-active-file').disabled = busy || importing || !activeEntry();
   $('#export-batch').disabled = busy || !hasReady;
   $('#export').disabled = busy || !result || resultDirty;
   $('#review-ready').hidden = !result || resultDirty;
@@ -546,6 +593,7 @@ async function chooseFiles(selection, fromFolder = false) {
     skipped = 0,
     duplicates = 0,
     firstAdded = null;
+  const addedEntries = [];
   const rejected = [],
     unreadable = [];
   const known = new Map();
@@ -608,6 +656,7 @@ async function chooseFiles(selection, fromFolder = false) {
           settings: { manual: false, estimate: false, values: {} },
         };
         entries.push(entry);
+        addedEntries.push(entry);
         candidates.push(entry);
         known.set(sourceKey, candidates);
         firstAdded ??= entry.id;
@@ -641,6 +690,7 @@ async function chooseFiles(selection, fromFolder = false) {
     folderInput.value = '';
     syncWorkflow();
   }
+  for (const entry of addedEntries) void prepareEntryThumbnail(entry);
 }
 folderInput.addEventListener('change', () =>
   chooseFiles(folderInput.files, true),
@@ -677,18 +727,63 @@ function loadPreview(url) {
   };
   image.src = url;
 }
+async function prepareEntryThumbnail(entry) {
+  if (
+    /\.(png|jpe?g)$/i.test(entry.file.name) ||
+    /image\/(png|jpeg)/.test(entry.file.type)
+  ) {
+    entry.thumbnailUrl = URL.createObjectURL(entry.file);
+    renderQueue();
+    return;
+  }
+  entry.thumbnailError = false;
+  renderQueue();
+  try {
+    const preview = await fetchEntryPreview(entry);
+    if (!entries.includes(entry)) return;
+    entry.thumbnailUrl = preview.preview;
+    entry.thumbnailError = false;
+  } catch (error) {
+    if (!entries.includes(entry)) return;
+    entry.thumbnailError = true;
+    entry.thumbnailErrorMessage =
+      error instanceof Error ? error.message : 'Önizleme yüklenemedi.';
+  } finally {
+    if (entries.includes(entry)) {
+      entry.thumbnailController = null;
+      renderQueue();
+    }
+  }
+}
+function fetchEntryPreview(entry) {
+  if (entry.preview) return Promise.resolve(entry.preview);
+  if (entry.previewPromise) return entry.previewPromise;
+  const controller = new AbortController();
+  entry.thumbnailController = controller;
+  entry.previewPromise = (async () => {
+    const body = new FormData();
+    body.set('file', entry.file);
+    const response = await fetch('/api/preview', {
+      method: 'POST',
+      body,
+      signal: controller.signal,
+    });
+    if (!response.ok) throw await readError(response);
+    entry.preview = await response.json();
+    return entry.preview;
+  })().finally(() => {
+    entry.thumbnailController = null;
+    entry.previewPromise = null;
+  });
+  return entry.previewPromise;
+}
 async function loadDicomPreview(entry) {
   const revision = previewRevision;
   $('#preview-heading').textContent = 'Önizleme hazırlanıyor…';
   $('#preview-message').textContent =
     'Görüntü, ölçüm alanı seçilmeden de görüntülenebilir.';
   try {
-    const body = new FormData();
-    body.set('file', entry.file);
-    const response = await fetch('/api/preview', { method: 'POST', body });
-    if (!response.ok) throw await readError(response);
-    const preview = await response.json();
-    entry.preview = preview;
+    const preview = await fetchEntryPreview(entry);
     if (activeId !== entry.id || previewRevision !== revision) return;
     $('#image-badge').textContent = unitLabel(preview.unit);
     loadPreview(preview.preview);
