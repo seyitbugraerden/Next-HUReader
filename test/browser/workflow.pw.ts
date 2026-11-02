@@ -4,6 +4,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { dicomFixture } from '../fixtures.js';
 import {
+  calculate,
   calibration,
   disk,
   flatImage,
@@ -24,6 +25,143 @@ function rows(sheet: ExcelJS.Worksheet): ExcelJS.CellValue[][] {
   });
   return result;
 }
+
+test('previous-step controls return to earlier pages without losing the analysis', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.locator('#file').setInputFiles({
+    name: 'previous-page.png',
+    mimeType: 'image/png',
+    buffer: await disk(80),
+  });
+  await settled(page);
+
+  await page.locator('#go-analyze').click();
+  await expect(page.locator('#panel-analyze')).toBeVisible();
+  await page.locator('#panel-analyze [data-step="1"]').click();
+  await expect(page.locator('#panel-upload')).toBeVisible();
+  await expect(page.locator('.queue-row')).toHaveCount(1);
+
+  await page.locator('#go-analyze').click();
+  await calculate(page);
+  await page.locator('#go-report').click();
+  await expect(page.locator('#panel-report')).toBeVisible();
+  await page.locator('.report-context [data-step="2"]').click();
+  await expect(page.locator('#panel-analyze')).toBeVisible();
+  await expect(page.locator('#review-ready')).toBeVisible();
+  await expect(page.locator('#metric-mean')).toHaveText('80,0');
+
+  await page.locator('#go-report').click();
+  await page.locator('#panel-report [data-step="1"]').click();
+  await expect(page.locator('#panel-upload')).toBeVisible();
+  await expect(page.locator('.queue-row')).toHaveCount(1);
+});
+
+test('workflow entrance animations respect reduced-motion preferences', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const animationDuration = async () =>
+    page.locator('#panel-upload').evaluate((panel) => {
+      const duration = getComputedStyle(panel).animationDuration.split(',')[0]!;
+      const value = Number.parseFloat(duration);
+      return duration.endsWith('ms') ? value : value * 1000;
+    });
+
+  expect(await animationDuration()).toBeGreaterThan(100);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect.poll(animationDuration).toBeLessThanOrEqual(1);
+});
+
+test('workflow steps are stacked vertically on desktop and mobile', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const workflowColumns = () =>
+    page.locator('.workflow').evaluate((workflow) => {
+      const style = getComputedStyle(workflow);
+      return style.gridTemplateColumns.split(' ').length;
+    });
+
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await expect.poll(workflowColumns).toBe(1);
+  await expect
+    .poll(() =>
+      page.locator('.wizard-navigation').evaluate((navigation) => {
+        const style = getComputedStyle(navigation);
+        return style.position === 'sticky' && style.gridColumnStart === '1';
+      }),
+    )
+    .toBe(true);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect.poll(workflowColumns).toBe(1);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    )
+    .toBe(true);
+});
+
+test('image source and guidance occupy separate rows', async ({ page }) => {
+  await page.goto('/');
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 1000 });
+    const layout = await page.locator('#panel-upload .upload-layout').evaluate(
+      (container) => {
+        const source = container.querySelector('.upload-card')!.getBoundingClientRect();
+        const guide = container.querySelector('.upload-guide')!.getBoundingClientRect();
+        return {
+          sourceBottom: source.bottom,
+          guideTop: guide.top,
+          sourceWidth: source.width,
+          guideWidth: guide.width,
+          contentWidth: document.documentElement.scrollWidth,
+          viewportWidth: window.innerWidth,
+        };
+      },
+    );
+
+    expect(layout.guideTop).toBeGreaterThanOrEqual(layout.sourceBottom);
+    expect(layout.guideWidth).toBeGreaterThan(layout.sourceWidth * 0.9);
+    expect(layout.contentWidth).toBeLessThanOrEqual(layout.viewportWidth);
+  }
+});
+
+test('all uploaded images can be cancelled and workflow resets to upload', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.locator('#file').setInputFiles([
+    { name: 'sample-A.png', mimeType: 'image/png', buffer: await disk(80) },
+    { name: 'sample-B.png', mimeType: 'image/png', buffer: await disk(180) },
+  ]);
+  await settled(page);
+  await expect(page.locator('.queue-row')).toHaveCount(2);
+  await expect(page.locator('#clear-files')).toBeVisible();
+  await page.locator('#go-analyze').click();
+  await expect(page.locator('#image-canvas')).toBeVisible();
+
+  await page.locator('#clear-files').click();
+
+  await expect(page.locator('.queue-row')).toHaveCount(0);
+  await expect(page.locator('#queue-card')).toBeHidden();
+  await expect(page.locator('#file-info')).toBeHidden();
+  await expect(page.locator('#file')).toBeEnabled();
+  await expect(page.locator('#go-analyze')).toBeDisabled();
+  await expect(page.locator('#step-upload')).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await expect(page.locator('#image-canvas')).toBeHidden();
+  await expect(page.locator('#empty')).toBeVisible();
+  await expect(page.locator('#file-label')).toHaveText(
+    'Görüntüleri sürükleyip bırakın',
+  );
+});
 
 test('per-file geometry, calibration, stale results and both Excel reports remain consistent', async ({
   page,

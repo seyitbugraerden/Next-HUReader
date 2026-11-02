@@ -2,14 +2,14 @@
 
 :root {
   color-scheme: light;
-  --ink: #1b293d;
-  --muted: #64748b;
-  --green: #0c7c75;
-  --line: #e2e8f0;
-  --bg: #f4f6f9;
+  --ink: #17243a;
+  --muted: #66758a;
+  --green: #087f78;
+  --line: #dfe7ef;
+  --bg: #f3f6fb;
   --paper: #fff;
-  --accent: #e8f5f2;
-  --radius: 12px;
+  --accent: #e9f7f5;
+  --radius: 16px;
   font-family:
     Inter,
     -apple-system,
@@ -100,7 +100,7 @@ h2 {
   visibility: visible;
 }
 header {
-  height: 80px;
+  height: 76px;
   padding: 0 3.4%;
   background: #fff;
   border-bottom: 1px solid var(--line);
@@ -124,8 +124,8 @@ header {
   height: 42px;
   border-radius: 12px;
   color: #fff;
-  background: #117c77;
-  box-shadow: 0 3px 7px #0c7c7517;
+  background: linear-gradient(145deg, #0d9488, #2357a6);
+  box-shadow: 0 5px 14px #117c7730;
 }
 .brand-icon .icon {
   width: 27px;
@@ -191,7 +191,7 @@ main {
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  margin-bottom: 27px;
+  margin-bottom: 24px;
 }
 .eyebrow {
   display: flex;
@@ -209,7 +209,7 @@ main {
   color: #c0c8d2;
 }
 h1 {
-  font-size: 31px;
+  font-size: 34px;
   font-weight: 650;
   letter-spacing: -1.1px;
   margin: 12px 0 8px;
@@ -445,6 +445,39 @@ h1 {
 .file-ready {
   margin-left: auto;
   color: #18816f;
+}
+.file-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid #f0b9b9;
+  border-radius: 9px;
+  color: #a64b51;
+  background: #fff8f8;
+  font-size: 10px;
+  font-weight: 550;
+  white-space: nowrap;
+  transition:
+    color 160ms ease,
+    background 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+.file-clear > span {
+  font-size: 16px;
+  line-height: 1;
+}
+.file-clear:hover:not(:disabled) {
+  border-color: #df8d92;
+  color: #873238;
+  background: #fff0f0;
+  transform: translateY(-1px);
+}
+.file-clear:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 .quiet {
   font-size: 11px;
@@ -1534,7 +1567,15 @@ dialog .primary {
 
 /* Step-by-step analysis workspace */
 .workflow {
-  margin-bottom: 25px;
+  margin-bottom: 0;
+}
+.wizard-navigation {
+  position: sticky;
+  top: 12px;
+  z-index: 8;
+  margin: 0 0 25px;
+  border-radius: 14px;
+  box-shadow: 0 8px 24px #17243a0d;
 }
 .workflow > button {
   display: flex;
@@ -1547,24 +1588,31 @@ dialog .primary {
   border: 0;
   text-align: left;
   min-width: 0;
+  transition:
+    background 0.18s,
+    color 0.18s;
 }
 .workflow > button + button {
   border-left: 1px solid var(--line);
 }
 .workflow > button.active {
-  background: #f0f9f7;
-  color: #12665f;
+  background: linear-gradient(120deg, #effaf8, #f3f7ff);
+  color: #075f5a;
+  box-shadow: inset 0 -3px #0d9488;
 }
 .workflow > button.complete {
-  color: #157d73;
+  color: #08756d;
 }
 .workflow > button:disabled {
   opacity: 1;
-  color: #94a1af;
+  color: #77869a;
   cursor: not-allowed;
 }
 .workflow > button:not(:disabled):hover {
-  background: #f2f8f7;
+  background: #f4f8fc;
+}
+.workflow > button.active:not(:disabled):hover {
+  background: linear-gradient(120deg, #eaf8f5, #eef3ff);
 }
 .workflow > button:focus-visible {
   outline-offset: -4px;
@@ -1662,10 +1710,17 @@ dialog .primary {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  position: relative;
+  border: 1px solid #e1e8ef;
+  border-radius: 13px;
+  background: #ffffffd9;
+  padding: 16px;
+  margin: 22px 0 4px;
+  box-shadow: 0 5px 18px #17243a08;
   gap: 18px;
-  border-top: 1px solid var(--line);
-  padding: 21px 0 4px;
-  margin-top: 12px;
+}
+.wizard-actions .back-button {
+  flex-shrink: 0;
 }
 .wizard-actions > p {
   color: #7c8fa0;
@@ -1679,14 +1734,29 @@ dialog .primary {
   margin: 0;
 }
 .back-button {
-  border: 0;
-  background: transparent;
-  color: #627d91;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  border: 1px solid #dce5ed;
+  border-radius: 9px;
+  background: #fff;
+  color: #435b72;
   font-size: 12px;
-  padding: 11px 0;
+  font-weight: 550;
+  padding: 0 15px;
+  transition:
+    color 0.15s,
+    border-color 0.15s,
+    background 0.15s,
+    box-shadow 0.15s;
 }
 .back-button:hover:not(:disabled) {
-  color: #0c7c75;
+  color: #076f69;
+  border-color: #9dcfc7;
+  background: #f3fbf9;
+  box-shadow: 0 2px 6px #0c7c7510;
 }
 .review-ready {
   background: #edf8f3;
@@ -1731,6 +1801,9 @@ dialog .primary {
   font-size: 34px;
 }
 @media (max-width: 1100px) {
+  .wizard-navigation {
+    top: 8px;
+  }
   .workflow > button {
     padding: 16px;
     gap: 10px;
@@ -1740,6 +1813,14 @@ dialog .primary {
   }
 }
 @media (max-width: 760px) {
+  .wizard-navigation {
+    top: 4px;
+    margin-bottom: 20px;
+  }
+  .wizard-navigation,
+  .workflow {
+    border-radius: 11px;
+  }
   .workflow > button {
     padding: 13px 9px;
     flex-direction: column;
@@ -1780,7 +1861,7 @@ dialog .primary {
   }
   .wizard-actions .back-button {
     width: 100%;
-    text-align: left;
+    justify-content: flex-start;
   }
   .report-context {
     flex-wrap: wrap;
@@ -1987,5 +2068,1157 @@ select {
   .folder-picker {
     flex-wrap: wrap;
     gap: 10px;
+  }
+}
+
+/* Restrained motion adds feedback without slowing down the analysis flow. */
+header {
+  animation: header-enter 520ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+.heading {
+  animation: rise-in 580ms 50ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+.wizard-navigation {
+  animation: rise-in 620ms 100ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+[role='tabpanel']:not([hidden]) {
+  animation: rise-in 460ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+  transform-origin: top center;
+}
+.stage-heading {
+  animation: rise-in 480ms 70ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+.upload-layout > :first-child {
+  animation: rise-in 520ms 100ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+.upload-layout > :last-child {
+  animation: rise-in 520ms 180ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+.upload-guide li {
+  animation: rise-in 420ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+.upload-guide li:nth-child(1) {
+  animation-delay: 240ms;
+}
+.upload-guide li:nth-child(2) {
+  animation-delay: 310ms;
+}
+.upload-guide li:nth-child(3) {
+  animation-delay: 380ms;
+}
+.wizard-actions {
+  animation: rise-in 480ms 230ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+.workflow > button {
+  overflow: hidden;
+}
+.workflow > button::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  content: '';
+  background: linear-gradient(90deg, #0d9488, #4f80d8);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 360ms cubic-bezier(0.2, 0.75, 0.25, 1);
+}
+.workflow > button.active::after {
+  transform: scaleX(1);
+}
+.workflow > button.active .step-index {
+  animation: step-pop 420ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+.dropzone {
+  background-image: linear-gradient(115deg, #f8fafc 0%, #edf8f5 45%, #f8fafc 90%);
+  background-size: 220% 100%;
+  background-position: 100% 0;
+  transition:
+    background-position 420ms ease,
+    border-color 200ms ease,
+    box-shadow 200ms ease;
+}
+.dropzone:hover,
+.dropzone.drag {
+  background-position: 0 0;
+  box-shadow: 0 8px 24px #0c7c7510;
+}
+.upload-symbol {
+  transition:
+    transform 220ms ease,
+    box-shadow 220ms ease,
+    color 220ms ease;
+}
+.dropzone:hover .upload-symbol,
+.dropzone.drag .upload-symbol {
+  color: #fff;
+  background: linear-gradient(145deg, #0d9488, #2357a6);
+  box-shadow: 0 7px 18px #0c7c7530;
+  transform: translateY(-4px) rotate(-5deg);
+}
+.primary span:last-child {
+  transition: transform 180ms ease;
+}
+.primary:hover:not(:disabled) span:last-child {
+  transform: translateX(4px);
+}
+.back-button:hover:not(:disabled) {
+  transform: translateX(-3px);
+}
+.back-button {
+  transition:
+    color 0.15s,
+    border-color 0.15s,
+    background 0.15s,
+    box-shadow 0.15s,
+    transform 0.18s ease;
+}
+.upload-card,
+.upload-guide,
+.viewer-card,
+.queue-card,
+.batch-summary {
+  transition:
+    transform 220ms ease,
+    box-shadow 220ms ease,
+    border-color 220ms ease;
+}
+.upload-card:hover,
+.upload-guide:hover,
+.viewer-card:hover,
+.queue-card:hover,
+.batch-summary:hover {
+  border-color: #cfdae6;
+  box-shadow: 0 10px 28px #17243a0d;
+  transform: translateY(-2px);
+}
+.queue-row {
+  transition:
+    background 180ms ease,
+    padding 180ms ease;
+}
+.queue-row:hover {
+  background: #f7fafc;
+  padding-right: 8px;
+  padding-left: 8px;
+}
+
+@keyframes header-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes step-pop {
+  0% {
+    transform: scale(0.88);
+  }
+  65% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* HUReader imaging studio redesign */
+body {
+  background:
+    radial-gradient(ellipse at 92% 10%, #dce8ff70, transparent 34rem),
+    radial-gradient(ellipse at 6% 40%, #d8f3ec66, transparent 30rem),
+    #f4f7fb;
+}
+header {
+  position: relative;
+  z-index: 10;
+  height: 74px;
+  padding-inline: max(4%, calc((100vw - 1600px) / 2));
+  background: #101b2c;
+  border-bottom: 1px solid #ffffff12;
+  box-shadow: 0 5px 24px #101b2c18;
+}
+.brand {
+  color: #f7fbff;
+}
+.brand-icon {
+  border: 1px solid #ffffff2b;
+  background: linear-gradient(145deg, #18b7a3, #426de1);
+  box-shadow: 0 7px 24px #397de14a;
+}
+.brand small {
+  color: #9cacc0;
+}
+.local,
+.help-button {
+  color: #c1ccda;
+}
+.local i {
+  box-shadow: 0 0 0 4px #31c5a321, 0 0 16px #31c5a3a6;
+}
+.header-divider {
+  background: #ffffff24;
+}
+.help-button:hover {
+  color: #70e0cf;
+}
+main {
+  max-width: 1720px;
+  padding: 38px 4% 0;
+}
+.heading {
+  position: relative;
+  isolation: isolate;
+  min-height: 238px;
+  padding: 38px 44px;
+  margin-bottom: 28px;
+  overflow: hidden;
+  border: 1px solid #324961;
+  border-radius: 24px;
+  color: #f8fbff;
+  background:
+    radial-gradient(ellipse at 85% 4%, #3b76d542, transparent 32%),
+    radial-gradient(ellipse at 70% 115%, #21b39c30, transparent 38%),
+    linear-gradient(115deg, #142238 0%, #172b45 52%, #183953 100%);
+  box-shadow: 0 22px 55px #14243c25;
+}
+.heading::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  content: '';
+  opacity: 0.18;
+  background-image:
+    linear-gradient(#a7c7e714 1px, transparent 1px),
+    linear-gradient(90deg, #a7c7e714 1px, transparent 1px);
+  background-size: 34px 34px;
+  mask-image: linear-gradient(90deg, transparent 22%, #000 100%);
+}
+.heading::after {
+  position: absolute;
+  z-index: -1;
+  top: 50%;
+  right: 12%;
+  width: 310px;
+  aspect-ratio: 1;
+  content: '';
+  border: 1px solid #9deee13b;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, #49d9c31a 0 19%, transparent 20% 35%, #79b4ed12 36% 37%, transparent 38%),
+    repeating-radial-gradient(circle, transparent 0 40px, #b6d6f21c 41px 42px);
+  box-shadow:
+    0 0 0 24px #6aa9ea0b,
+    0 0 0 58px #6aa9ea08,
+    inset 0 0 50px #28c5ac16;
+  transform: translate(20%, -50%);
+  animation: orbit-breathe 8s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+.heading > div:first-child,
+.workspace-label {
+  position: relative;
+  z-index: 1;
+}
+.heading .eyebrow {
+  color: #9bb2c9;
+}
+.heading .eyebrow > span:first-child {
+  color: #6ae0cf;
+}
+.heading .breadcrumb {
+  color: #58738f;
+}
+.heading h1 {
+  max-width: 760px;
+  margin-top: 16px;
+  color: white;
+  font-size: clamp(36px, 4vw, 52px);
+  font-weight: 650;
+  letter-spacing: -2px;
+}
+.heading p {
+  max-width: 580px;
+  color: #bac9d9;
+  font-size: 15px;
+}
+.workspace-label {
+  padding: 14px 18px;
+  border: 1px solid #ffffff24;
+  border-radius: 14px;
+  color: #edf5fc;
+  background: #ffffff0d;
+  box-shadow: inset 0 1px #ffffff12;
+  backdrop-filter: blur(12px);
+}
+.workspace-label small {
+  color: #9db0c4;
+}
+.workspace-mark {
+  width: 48px;
+  height: 48px;
+  border-color: #70ded13d;
+  border-radius: 13px;
+  color: #84e4d6;
+  background: #38baa31a;
+}
+.wizard-navigation {
+  top: 10px;
+  padding: 7px;
+  border: 1px solid #e2e9f2;
+  border-radius: 20px;
+  background: #ffffffd9;
+  box-shadow: 0 12px 32px #1e355014;
+  backdrop-filter: blur(18px);
+}
+.workflow {
+  gap: 8px;
+  overflow: visible;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+}
+.workflow > button,
+.workflow > button + button {
+  min-height: 78px;
+  padding: 15px 19px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: #f6f8fb;
+  box-shadow: inset 0 1px #fff;
+}
+.workflow > button + button {
+  border-left: 1px solid transparent;
+}
+.workflow > button.active {
+  color: #fff;
+  background:
+    radial-gradient(ellipse at 100% 0, #4b83dc40, transparent 48%),
+    linear-gradient(120deg, #18334c, #204c65);
+  box-shadow:
+    0 8px 20px #173a5530,
+    inset 0 1px #ffffff1a;
+}
+.workflow > button.active .step-copy,
+.workflow > button.active small,
+.workflow > button.active .step-indicator {
+  color: #f4fbff;
+}
+.workflow > button.active small {
+  opacity: 0.72;
+}
+.workflow > button.active .step-index {
+  border-color: #76ddcc55;
+  color: #a4f0e2;
+  background: #3cc5ae20;
+}
+.workflow > button.complete {
+  border-color: #cde9e1;
+  color: #08766e;
+  background: #f0faf7;
+}
+.workflow > button.complete .step-index {
+  border-color: #b8e3d6;
+  color: #08766e;
+  background: #def5ed;
+}
+.workflow > button:disabled {
+  color: #74849a;
+  background: #f7f9fc;
+}
+.workflow > button:disabled .step-index {
+  color: #8492a4;
+}
+.workflow > button::after {
+  right: 16px;
+  left: 16px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #49d7be, #82b5ff);
+}
+.workflow > button.active::after {
+  transform: scaleX(0.3);
+}
+.workflow > button:not(:disabled):hover {
+  border-color: #cddbe7;
+  background: #edf3f8;
+  transform: translateY(-2px);
+}
+.workflow > button.active:not(:disabled):hover {
+  border-color: #5da9a7;
+  background:
+    radial-gradient(ellipse at 100% 0, #4b83dc55, transparent 48%),
+    linear-gradient(120deg, #1a3b56, #24566f);
+}
+.workflow > button {
+  transition:
+    background 220ms ease,
+    color 220ms ease,
+    border-color 220ms ease,
+    box-shadow 220ms ease,
+    transform 220ms ease;
+}
+.step-copy {
+  font-size: 13px;
+  font-weight: 650;
+}
+.workflow small {
+  color: #7d8ca0;
+}
+.step-index {
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  font-size: 11px;
+}
+.step-indicator {
+  color: #94a5b8;
+}
+.stage-heading {
+  margin: 34px 0 24px;
+}
+.stage-heading h2 {
+  font-size: 26px;
+  letter-spacing: -0.8px;
+}
+.stage-heading p {
+  font-size: 13px;
+}
+.card {
+  border-color: #e4eaf2;
+  border-radius: 19px;
+  box-shadow: 0 12px 34px #1d35500c;
+}
+.upload-card,
+.upload-guide {
+  padding: 28px;
+}
+.upload-guide {
+  position: relative;
+  overflow: hidden;
+  border-color: #dce9f1;
+  background:
+    radial-gradient(ellipse at 100% 0, #dcecffb0, transparent 38%),
+    linear-gradient(145deg, #fff, #f8fbff);
+}
+.upload-guide::after {
+  position: absolute;
+  top: -78px;
+  right: -78px;
+  width: 190px;
+  aspect-ratio: 1;
+  content: '';
+  border: 1px solid #72b8cd2b;
+  border-radius: 50%;
+  box-shadow: 0 0 0 20px #72b8cd0b, 0 0 0 43px #72b8cd08;
+  pointer-events: none;
+}
+.upload-guide h2 {
+  max-width: 390px;
+  font-size: 25px;
+  letter-spacing: -0.8px;
+}
+.upload-guide > p {
+  max-width: 500px;
+  color: #6c7d91;
+}
+.upload-guide li {
+  border-color: #e6edf4;
+}
+.upload-guide li::before {
+  width: 8px;
+  height: 8px;
+  background: #16a995;
+  box-shadow: 0 0 0 4px #16a99518;
+}
+.dropzone {
+  min-height: 290px;
+  border: 1.5px dashed #9bbbc5;
+  border-radius: 16px;
+  background:
+    radial-gradient(ellipse at 50% 0, #e1f4f0, transparent 70%),
+    #f8fbfd;
+}
+.dropzone:hover,
+.dropzone.drag {
+  border-color: #15998c;
+  background:
+    radial-gradient(ellipse at 50% 0, #d4f1eb, transparent 75%),
+    #f4fbf9;
+}
+.upload-symbol {
+  width: 56px;
+  height: 56px;
+  border-color: #d2e7e6;
+  border-radius: 16px;
+  color: #087f78;
+  box-shadow: 0 8px 22px #1e435012;
+}
+.upload-symbol .icon {
+  width: 26px;
+  height: 26px;
+}
+.wizard-actions {
+  border-color: #e1e8f0;
+  border-radius: 16px;
+  padding: 16px 18px;
+  background: #ffffffd9;
+  box-shadow: 0 8px 24px #1d35500a;
+  backdrop-filter: blur(14px);
+}
+.primary {
+  border: 1px solid #08786f;
+  border-radius: 11px;
+  background: linear-gradient(110deg, #07877c, #126f9a);
+  box-shadow: 0 7px 18px #07877c27;
+}
+.primary:hover:not(:disabled) {
+  background: linear-gradient(110deg, #06776e, #105d84);
+  box-shadow: 0 9px 22px #07877c3d;
+  transform: translateY(-1px);
+}
+.back-button {
+  min-height: 46px;
+  border-color: #d8e2eb;
+  border-radius: 11px;
+  color: #405871;
+  background: #fff;
+}
+.back-button:hover:not(:disabled) {
+  border-color: #8bcfc5;
+  background: #eef9f6;
+}
+.queue-card,
+.batch-summary {
+  border-radius: 19px;
+}
+footer {
+  color: #76869a;
+}
+@keyframes orbit-breathe {
+  from {
+    opacity: 0.65;
+    transform: translate(20%, -50%) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translate(20%, -50%) scale(1.04);
+  }
+}
+@media (max-width: 1100px) {
+  main {
+    padding-inline: 3%;
+  }
+  .heading {
+    padding: 34px;
+  }
+  .heading::after {
+    right: 7%;
+  }
+}
+@media (max-width: 760px) {
+  header {
+    height: 66px;
+    padding-inline: 18px;
+  }
+  .brand {
+    gap: 9px;
+    font-size: 19px;
+  }
+  .brand-icon {
+    width: 38px;
+    height: 38px;
+  }
+  .header-actions {
+    gap: 12px;
+  }
+  .local {
+    font-size: 0;
+  }
+  .local i {
+    width: 8px;
+    height: 8px;
+  }
+  .header-divider {
+    display: none;
+  }
+  .help-button {
+    gap: 5px;
+    font-size: 10px;
+  }
+  main {
+    padding: 20px 16px 0;
+  }
+  .heading {
+    min-height: 0;
+    padding: 25px 22px;
+    margin-bottom: 18px;
+    border-radius: 20px;
+  }
+  .heading h1 {
+    max-width: 90%;
+    font-size: clamp(32px, 9vw, 42px);
+    letter-spacing: -1.5px;
+  }
+  .heading p {
+    max-width: 90%;
+    font-size: 13px;
+  }
+  .heading::after {
+    top: 24%;
+    right: -20%;
+    width: 190px;
+    transform: translate(20%, -20%);
+  }
+  .workspace-label {
+    margin-top: 24px;
+    padding: 10px 12px;
+  }
+  .workspace-mark {
+    width: 40px;
+    height: 40px;
+  }
+  .wizard-navigation {
+    top: 4px;
+    padding: 5px;
+    margin-bottom: 18px;
+    border-radius: 16px;
+  }
+  .workflow {
+    gap: 4px;
+  }
+  .workflow > button,
+  .workflow > button + button {
+    min-height: 70px;
+    padding: 10px 6px;
+    border-radius: 11px;
+    align-items: center;
+  }
+  .step-index {
+    width: 31px;
+    height: 31px;
+    border-radius: 9px;
+  }
+  .step-copy {
+    font-size: 9px;
+    text-align: center;
+    line-height: 1.35;
+  }
+  .workflow small {
+    font-size: 8px;
+    line-height: 1.3;
+  }
+  .step-indicator {
+    display: none;
+  }
+  .workflow > button::after {
+    right: 9px;
+    left: 9px;
+  }
+  .stage-heading h2 {
+    font-size: 22px;
+  }
+  .upload-card,
+  .upload-guide {
+    padding: 20px;
+  }
+  .upload-guide h2 {
+    font-size: 22px;
+  }
+  .dropzone {
+    min-height: 225px;
+  }
+  .wizard-actions {
+    padding: 13px;
+    border-radius: 14px;
+  }
+}
+
+/* Distinct visual treatment for the two upload-stage panels. */
+#panel-upload .upload-layout {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+#panel-upload .upload-layout > :first-child {
+  min-width: 0;
+}
+#panel-upload .upload-card {
+  height: auto;
+  padding: 28px;
+  border: 1px solid #263d54;
+  border-radius: 22px;
+  color: #e8f1f8;
+  background:
+    radial-gradient(ellipse at 100% 0, #1d7b8050, transparent 38%),
+    linear-gradient(155deg, #16283d, #102033 72%);
+  box-shadow: 0 20px 46px #14243c25, inset 0 1px #ffffff12;
+}
+#panel-upload .upload-card .section-title {
+  margin-bottom: 22px;
+}
+#panel-upload .upload-card .section-title h2 {
+  color: #f3f8fc;
+  font-size: 16px;
+}
+#panel-upload .upload-card .number {
+  width: 34px;
+  height: 34px;
+  border-color: #54bdaa45;
+  border-radius: 10px;
+  color: #8be4d3;
+  background: #54bdaa17;
+}
+#panel-upload .dropzone {
+  min-height: 270px;
+  border: 1px dashed #7ccfc187;
+  border-radius: 17px;
+  color: #eaf5f7;
+  background:
+    radial-gradient(ellipse at 50% 0, #44c7ac19, transparent 70%),
+    #ffffff08;
+}
+#panel-upload .dropzone:hover,
+#panel-upload .dropzone.drag {
+  border-color: #70ebd1;
+  background:
+    radial-gradient(ellipse at 50% 0, #44c7ac30, transparent 70%),
+    #ffffff0d;
+  box-shadow: inset 0 0 35px #43c9ad0c, 0 10px 24px #060e1828;
+}
+#panel-upload .upload-symbol {
+  width: 62px;
+  height: 62px;
+  color: #9af0dc;
+  border: 1px solid #6bddc34d;
+  border-radius: 19px;
+  background: linear-gradient(145deg, #52d1b51f, #6ea8f31a);
+  box-shadow: 0 8px 26px #45cfb31a, inset 0 1px #ffffff17;
+}
+#panel-upload .dropzone:hover .upload-symbol,
+#panel-upload .dropzone.drag .upload-symbol {
+  color: #102b3b;
+  border-color: #a7f5df;
+  background: linear-gradient(145deg, #a5f2d8, #84d9e8);
+}
+#panel-upload .dropzone strong {
+  color: #f3fafb;
+  font-size: 14px;
+  font-weight: 600;
+}
+#panel-upload .dropzone > span:not(.upload-symbol) {
+  color: #afc1d0;
+}
+#panel-upload .dropzone small {
+  margin-top: 24px;
+  padding: 7px 10px;
+  border: 1px solid #d5e8f019;
+  border-radius: 999px;
+  color: #a9bfce;
+  background: #ffffff08;
+}
+#panel-upload .format-divider {
+  color: #65cfb9;
+}
+#panel-upload .folder-picker {
+  margin-top: 18px;
+}
+#panel-upload .folder-picker .secondary {
+  min-height: 42px;
+  border-color: #7bd5c14a;
+  border-radius: 10px;
+  color: #c8f2e7;
+  background: #46bba91c;
+}
+#panel-upload .folder-picker .secondary:hover:not(:disabled) {
+  border-color: #8ce9d5;
+  background: #46bba92c;
+}
+#panel-upload .folder-picker > span,
+#panel-upload .upload-card > .quiet {
+  color: #9cafbf;
+}
+#panel-upload .upload-card > .quiet:not(.privacy-note) {
+  margin-top: 14px;
+  font-size: 10px;
+}
+#panel-upload .privacy-note {
+  align-items: center;
+  padding-top: 12px;
+  border-top: 1px solid #ffffff14;
+  color: #b6c8d6;
+}
+#panel-upload .privacy-note .icon {
+  color: #67d2b9;
+}
+#panel-upload .file-info {
+  color: #c3d6e1;
+}
+#panel-upload .file-type {
+  border-color: #ffffff20;
+  color: #c7e9e3;
+  background: #ffffff0d;
+}
+#panel-upload .file-ready {
+  color: #77dfbf;
+}
+#panel-upload .file-clear {
+  margin-left: 4px;
+  border-color: #ffb9b933;
+  color: #ffd2d2;
+  background: #e85d5d16;
+}
+#panel-upload .file-clear:hover:not(:disabled) {
+  border-color: #ffaaaab0;
+  color: #fff;
+  background: #d84a4a45;
+}
+#panel-upload .sidebar-note {
+  margin: 14px 5px 0;
+  padding: 12px 14px;
+  border: 1px solid #d8e6ef;
+  border-radius: 13px;
+  color: #667b8f;
+  background: #ffffffa6;
+}
+#panel-upload .sidebar-note > .icon {
+  color: #137e83;
+}
+#panel-upload .sidebar-note b {
+  color: #334d63;
+}
+#panel-upload .upload-guide {
+  height: auto;
+  min-height: 0;
+  padding: 30px;
+  border: 1px solid #d2e8e2;
+  border-radius: 22px;
+  color: #143b42;
+  background:
+    radial-gradient(ellipse at 100% 0, #d6f1e8 0, transparent 43%),
+    linear-gradient(150deg, #eff9f4, #e5f1ee 58%, #e8f0f8);
+  box-shadow: 0 20px 46px #18394a12, inset 0 1px #fff;
+}
+#panel-upload .upload-guide::after {
+  display: none;
+}
+#panel-upload .upload-guide > .eyebrow {
+  display: inline-flex;
+  padding: 7px 10px;
+  border: 1px solid #0e887735;
+  border-radius: 999px;
+  color: #1d7771;
+  background: #ffffff86;
+  font-size: 8px;
+  letter-spacing: 1.3px;
+}
+#panel-upload .upload-guide h2 {
+  max-width: 360px;
+  margin-top: 14px;
+  color: #163440;
+  font-size: clamp(24px, 2.2vw, 32px);
+  line-height: 1.12;
+  letter-spacing: -1.2px;
+}
+#panel-upload .upload-guide > p {
+  max-width: 420px;
+  margin: 12px 0 17px;
+  color: #607880;
+  font-size: 11px;
+}
+#panel-upload .scan-visual {
+  position: relative;
+  margin: 18px 0 19px;
+  padding: 12px 13px 10px;
+  overflow: hidden;
+  border: 1px solid #244c5d;
+  border-radius: 16px;
+  background:
+    radial-gradient(ellipse at 50% 55%, #2a687251, transparent 54%),
+    linear-gradient(135deg, #152b40, #1b384a);
+  box-shadow: 0 11px 26px #153d451c, inset 0 1px #ffffff12;
+}
+#panel-upload .scan-visual-caption,
+#panel-upload .scan-visual-scale {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #a9c5d0;
+  font: 8px 'IBM Plex Mono', monospace;
+  letter-spacing: 1.1px;
+}
+#panel-upload .scan-visual-caption i {
+  padding-inline: 3px;
+  color: #4fc4ae;
+  font-style: normal;
+}
+#panel-upload .scan-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #a9f0d7;
+}
+#panel-upload .scan-live::before,
+#panel-upload .scan-visual-scale i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #71e0bc;
+  box-shadow: 0 0 10px #71e0bc9c;
+  content: '';
+}
+#panel-upload .scan-visual svg {
+  display: block;
+  width: 100%;
+  height: clamp(118px, 13vw, 160px);
+}
+#panel-upload .scan-visual-scale {
+  justify-content: flex-start;
+  color: #90b1c0;
+  font-size: 7px;
+  letter-spacing: 0.8px;
+}
+#panel-upload .scan-visual-scale i {
+  width: 4px;
+  height: 4px;
+  margin-inline: 2px;
+}
+#panel-upload .upload-guide ul {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+#panel-upload .upload-guide li {
+  min-width: 0;
+  padding: 13px 11px 12px;
+  border: 1px solid #d0e2dd;
+  border-radius: 13px;
+  background: #ffffff8a;
+}
+#panel-upload .upload-guide li::before {
+  position: static;
+  display: block;
+  width: 7px;
+  height: 7px;
+  margin-bottom: 11px;
+  background: #178f81;
+  box-shadow: 0 0 0 4px #178f8118;
+}
+#panel-upload .upload-guide li b {
+  color: #254c52;
+  font-size: 10px;
+  line-height: 1.45;
+}
+#panel-upload .upload-guide li span {
+  margin-top: 6px;
+  color: #657f82;
+  font-size: 9px;
+  line-height: 1.55;
+}
+@media (max-width: 1100px) {
+  #panel-upload .upload-guide ul {
+    grid-template-columns: 1fr;
+  }
+  #panel-upload .upload-guide li {
+    display: grid;
+    grid-template-columns: 10px minmax(0, 1fr);
+    column-gap: 9px;
+    padding: 10px 12px;
+  }
+  #panel-upload .upload-guide li::before {
+    grid-row: span 2;
+    margin: 4px 0 0;
+  }
+  #panel-upload .upload-guide li span {
+    margin-top: 3px;
+  }
+}
+@media (max-width: 760px) {
+  #panel-upload .upload-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 13px;
+  }
+  #panel-upload .upload-card,
+  #panel-upload .upload-guide {
+    height: auto;
+    min-height: 0;
+    padding: 20px;
+    border-radius: 18px;
+  }
+  #panel-upload .dropzone {
+    min-height: 235px;
+  }
+  #panel-upload .upload-guide h2 {
+    font-size: 26px;
+  }
+  #panel-upload .scan-visual {
+    margin-block: 15px;
+  }
+  #panel-upload .scan-visual svg {
+    height: 130px;
+  }
+  #panel-upload .upload-guide ul {
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+  #panel-upload .upload-guide li {
+    grid-template-columns: 10px minmax(0, 1fr);
+  }
+  #panel-upload .file-info {
+    flex-wrap: wrap;
+  }
+  #panel-upload .file-clear {
+    margin-left: 0;
+  }
+}
+
+/* The workflow is a vertical stepper, not a row of tabs. */
+@media (min-width: 761px) {
+  main {
+    display: grid;
+    grid-template-columns: minmax(190px, 0.24fr) minmax(0, 1fr);
+    column-gap: 26px;
+    align-items: start;
+  }
+  main > .heading,
+  main > footer {
+    grid-column: 1 / -1;
+  }
+  main > .heading {
+    grid-row: 1;
+  }
+  main > .wizard-navigation {
+    grid-column: 1;
+    grid-row: 2;
+    position: sticky;
+    top: 16px;
+    width: 100%;
+    padding: 8px;
+    margin: 0;
+  }
+  main > .wizard-workspace {
+    grid-column: 2;
+    grid-row: 2;
+    min-width: 0;
+  }
+  main > footer {
+    grid-row: 3;
+  }
+  .workflow {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 7px;
+  }
+  .workflow > button,
+  .workflow > button + button {
+    min-height: 76px;
+    padding: 13px;
+    border: 1px solid transparent;
+    border-radius: 13px;
+  }
+  .workflow > button + button {
+    border-left: 1px solid transparent;
+  }
+  .workflow > button::after {
+    top: 13px;
+    right: auto;
+    bottom: 13px;
+    left: 0;
+    width: 3px;
+    height: auto;
+    border-radius: 0 3px 3px 0;
+    background: linear-gradient(180deg, #49d7be, #82b5ff);
+    transform: scaleY(0);
+    transform-origin: top;
+  }
+  .workflow > button.active::after {
+    transform: scaleY(1);
+  }
+  .workflow > button:not(:disabled):hover {
+    transform: translateX(2px);
+  }
+  .workflow > button.active:not(:disabled):hover {
+    transform: translateX(2px);
+  }
+}
+@media (max-width: 760px) {
+  main {
+    display: block;
+  }
+  main > .heading,
+  main > .wizard-navigation,
+  main > .wizard-workspace,
+  main > footer {
+    width: 100%;
+  }
+  main > .wizard-navigation {
+    position: static;
+    padding: 7px;
+    margin: 0 0 20px;
+  }
+  .workflow {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+  .workflow > button,
+  .workflow > button + button {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr) auto;
+    min-height: 58px;
+    padding: 9px 12px;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    align-items: center;
+    column-gap: 11px;
+    text-align: left;
+  }
+  .workflow > button + button {
+    border-left: 1px solid transparent;
+  }
+  .workflow > button .step-index {
+    grid-row: 1;
+  }
+  .workflow > button .step-copy {
+    text-align: left;
+    font-size: 11px;
+  }
+  .workflow > button .step-copy small {
+    margin-top: 3px;
+    font-size: 9px;
+  }
+  .workflow > button .step-indicator {
+    display: block;
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .workflow > button::after {
+    top: 9px;
+    right: auto;
+    bottom: 9px;
+    left: 0;
+    width: 3px;
+    height: auto;
+    border-radius: 0 3px 3px 0;
+    background: linear-gradient(180deg, #49d7be, #82b5ff);
+    transform: scaleY(0);
+    transform-origin: top;
+  }
+  .workflow > button.active::after {
+    transform: scaleY(1);
   }
 }

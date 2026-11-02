@@ -252,6 +252,16 @@ function removeEntry(id) {
   if (!entries.length) currentStep = 1;
   syncWorkflow();
 }
+function clearEntries() {
+  if (busy || importing || !entries.length) return;
+  entries = [];
+  currentStep = 1;
+  $('#batch-progress').hidden = true;
+  $('#import-summary').hidden = true;
+  $('#import-summary').textContent = '';
+  selectEntry(null, false);
+}
+$('#clear-files').addEventListener('click', clearEntries);
 $('#active-file').addEventListener('change', (event) =>
   selectEntry(event.target.value),
 );
