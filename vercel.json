@@ -1,5 +1,16 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": "nestjs",
-  "buildCommand": "npm run build"
+  "framework": null,
+  "buildCommand": "npm run build",
+  "outputDirectory": "public",
+  "functions": {
+    "api/index.mjs": {
+      "includeFiles": "{dist/**,node_modules/exceljs/dist/exceljs.min.js}"
+    }
+  },
+  "rewrites": [
+    { "source": "/health", "destination": "/api" },
+    { "source": "/api/:path*", "destination": "/api" },
+    { "source": "/vendor/:path*", "destination": "/api" }
+  ]
 }
