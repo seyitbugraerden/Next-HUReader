@@ -56,6 +56,8 @@ async function createBatchWorkbook(entries) {
     'Kenar payı (px)',
     'İç yarıçap (px)',
     'Otomatik',
+    'Şekil',
+    'Köşeler',
   ]);
   sheets.status.addRow(['Sıra', 'Dosya', 'Durum', 'Açıklama']);
   const unit = (value) =>
@@ -114,6 +116,20 @@ async function createBatchWorkbook(entries) {
     Object.entries({
       ...r.metadata,
       Matris: `${r.width} × ${r.height}`,
+      'Sayısal değerlendirme': (r.interpretation || []).join(' '),
+      ...(r.defects
+        ? {
+            'Düşük yoğunluk adayı sayısı': r.defects.count,
+            'İnce/uzamış aday sayısı': r.defects.elongatedCount,
+            'Aday alan oranı (%)': r.defects.percent,
+            'Aday tarama eşiği': r.defects.threshold,
+            'Eşik kaynağı':
+              r.defects.thresholdSource === 'user'
+                ? 'Kullanıcı'
+                : 'Otomatik öneri',
+            'Aday bölgeler (en büyük 50)': JSON.stringify(r.defects.regions),
+          }
+        : {}),
       'Piksel boyutu X (mm)': r.spacing?.[0] ?? 'Belirtilmedi',
       'Piksel boyutu Y (mm)': r.spacing?.[1] ?? 'Belirtilmedi',
     }).forEach(([key, value]) =>
@@ -136,10 +152,12 @@ async function createBatchWorkbook(entries) {
       ...identity,
       r.roi.x,
       r.roi.y,
-      r.roi.radius,
+      r.roi.points ? null : r.roi.radius,
       r.roi.insetPixels,
-      r.roi.innerRadius,
+      r.roi.points ? null : r.roi.innerRadius,
       r.roi.automatic ? 'Evet' : 'Hayır',
+      r.roi.shape || 'circle',
+      r.roi.points ? JSON.stringify(r.roi.points) : '',
     ]);
   }
   // One annotated preview per successful file, below the coordinate table.
@@ -159,17 +177,37 @@ async function createBatchWorkbook(entries) {
     canvas.height = r.height;
     const ctx = canvas.getContext('2d');
     ctx.drawImage(image, 0, 0);
+    if (r.defects?.overlay) {
+      const overlay = new Image();
+      await new Promise((resolve, reject) => {
+        overlay.onload = resolve;
+        overlay.onerror = () =>
+          reject(new Error('Aday bölge önizlemesi okunamadı.'));
+        overlay.src = r.defects.overlay;
+      });
+      ctx.drawImage(overlay, 0, 0);
+    }
     ctx.lineWidth = Math.max(1, r.width / 350);
     ctx.strokeStyle = '#ffb454';
     ctx.setLineDash([5, 4]);
     ctx.beginPath();
-    ctx.arc(r.roi.x, r.roi.y, r.roi.radius, 0, 2 * Math.PI);
+    if (r.roi.points) {
+      ctx.moveTo(...r.roi.points[0]);
+      for (const point of r.roi.points.slice(1)) ctx.lineTo(...point);
+      ctx.closePath();
+    } else ctx.arc(r.roi.x, r.roi.y, r.roi.radius, 0, 2 * Math.PI);
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.strokeStyle = '#50fa90';
     ctx.beginPath();
-    ctx.arc(r.roi.x, r.roi.y, r.roi.innerRadius, 0, 2 * Math.PI);
-    ctx.stroke();
+    if (r.roi.points) {
+      ctx.fillStyle = '#50fa90';
+      for (const [x, y] of r.roi.innerBoundary || [])
+        ctx.fillRect(x - 0.5, y - 0.5, 1, 1);
+    } else {
+      ctx.arc(r.roi.x, r.roi.y, r.roi.innerRadius, 0, 2 * Math.PI);
+      ctx.stroke();
+    }
     const id = book.addImage({
       base64: canvas.toDataURL('image/png'),
       extension: 'png',

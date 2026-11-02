@@ -7,6 +7,7 @@ let file = null;
 let result = null;
 let analyzedBody = null;
 let previewImage = null;
+let candidateOverlay = null;
 let previewRevision = 0;
 let currentPreviewUrl = null;
 let busy = false;
@@ -15,6 +16,10 @@ let resultDirty = true;
 let entries = [];
 let activeId = null;
 const optionNames = [
+  'roiShape',
+  'roiPoints',
+  'lowDensityThreshold',
+  'materialReference',
   'centerX',
   'centerY',
   'radius',
@@ -52,6 +57,9 @@ function applySettings(settings) {
   $('#estimate').checked = settings.estimate;
   for (const key of optionNames)
     form.elements[key].value = settings.values[key] ?? '';
+  form.elements.roiShape.value = settings.values.roiShape || 'circle';
+  form.elements.materialReference.value =
+    settings.values.materialReference || 'marble-excel';
   for (const key of ['centerX', 'centerY', 'radius']) {
     form.elements[key].disabled = !settings.manual;
     form.elements[key].required = settings.manual;
@@ -61,6 +69,7 @@ function applySettings(settings) {
     form.elements[key].required = settings.estimate;
   }
   $('#canvas-hint').hidden = !settings.manual;
+  syncShapeControls();
 }
 function entryStatus(entry) {
   return entry.processing
@@ -133,6 +142,14 @@ function renderQueue() {
     `${ready}/${entries.length} hesaplandı${errors ? ` · ${errors} hata` : ''}`;
   $('#batch-report-note').textContent =
     `${ready} dosyanın güncel ölçümleri rapora dahil edilir. ${entries.length - ready} dosya hatalı, bekliyor veya yeniden hesaplanmalı. Her ölçüm alanını ilgili dosyada kontrol edin.`;
+  const compared = readyEntries().map((entry) => entry.result);
+  const comparable =
+    compared.length > 1 && compared.every((r) => r.unit === compared[0].unit);
+  $('#comparison-summary').textContent = comparable
+    ? `${compared.length} güncel dosyada seçili alan ortalamaları ${fmt(Math.min(...compared.map((r) => r.measurements[0].mean)))}–${fmt(Math.max(...compared.map((r) => r.measurements[0].mean)))} ${unitLabel(compared[0].unit)} arasında. Bu sayısal aralık bir değişim veya kusur kararı değildir; aynı numune, kalibrasyon ve karşılaştırılabilir ölçüm alanları kullanıldığını doğrulayın.`
+    : compared.length > 1
+      ? 'Ölçüm birimleri farklı; dosyalar için ortak yoğunluk karşılaştırması yapılmadı.'
+      : '';
   $('#batch-measurements').replaceChildren(
     ...entries.map((entry) => {
       const row = document.createElement('tr'),
@@ -180,8 +197,12 @@ function selectEntry(id, save = true) {
   }
   previewRevision++;
   previewImage = null;
+  candidateOverlay = null;
   $('#image-canvas').hidden = true;
   $('#empty').hidden = false;
+  $('#preview-heading').textContent = 'Analiz için bir görüntü yükleyin';
+  $('#preview-message').textContent =
+    'Dosyanızı yüklediğinizde kesit burada görünür. Numune sınırını kontrol ederek ölçüme başlayın.';
   $('#dimensions').textContent = '— × — px';
   $('#image-title').textContent = entry
     ? entryLabel(entry)
@@ -196,12 +217,17 @@ function selectEntry(id, save = true) {
   $('#results').hidden = !result;
   if (result) {
     renderResults(false);
+  } else if (entry?.preview) {
+    $('#image-badge').textContent = unitLabel(entry.preview.unit);
+    loadPreview(entry.preview.preview);
   } else if (
     file &&
     (/\.(png|jpe?g)$/i.test(file.name) || /image\/(png|jpeg)/.test(file.type))
   ) {
     currentPreviewUrl = URL.createObjectURL(file);
     loadPreview(currentPreviewUrl);
+  } else if (entry) {
+    loadDicomPreview(entry);
   }
   syncWorkflow();
 }
@@ -269,9 +295,12 @@ function syncWorkflow() {
   });
   $('#go-analyze').disabled = busy || importing || !entries.length;
   fileInput.disabled = busy || importing;
-  folderInput.disabled = busy || importing;
-  $('#choose-folder').disabled =
+  folderInput.disabled =
     busy || importing || !('webkitdirectory' in folderInput);
+  $('#choose-folder').setAttribute(
+    'aria-disabled',
+    String(folderInput.disabled),
+  );
   $('#go-report').disabled = busy || !hasReady;
   $('#analyze-all').disabled = busy || !entries.length;
   $('#export-batch').disabled = busy || !hasReady;
@@ -342,16 +371,70 @@ function dirty() {
   }
 }
 function toggleManual() {
-  const enabled = $('#manual').checked;
+  const enabled =
+    $('#manual').checked && form.elements.roiShape.value === 'circle';
   for (const key of ['centerX', 'centerY', 'radius']) {
     form.elements[key].disabled = !enabled;
     form.elements[key].required = enabled;
   }
   $('#canvas-hint').hidden = !enabled;
+  syncShapeControls();
   dirty();
   drawPreview();
 }
 $('#manual').addEventListener('change', toggleManual);
+$('#show-candidates').addEventListener('change', drawPreview);
+$('#material-reference').addEventListener('change', () => {
+  if (!busy) dirty();
+});
+function selectedPoints() {
+  try {
+    return JSON.parse(form.elements.roiPoints.value || '[]');
+  } catch {
+    return [];
+  }
+}
+function syncShapeControls() {
+  const shape = form.elements.roiShape.value;
+  const circular = shape === 'circle';
+  $('#circle-fields').hidden = !circular;
+  $('#polygon-tools').hidden = circular;
+  $('#manual').disabled = !circular;
+  if (!circular) $('#manual').checked = true;
+  form.elements.roiPoints.disabled = circular;
+  for (const key of ['centerX', 'centerY', 'radius']) {
+    form.elements[key].disabled = !circular || !$('#manual').checked;
+    form.elements[key].required = circular && $('#manual').checked;
+  }
+  $('#canvas-hint').hidden = !circular || !$('#manual').checked;
+  $('#roi-guidance').textContent =
+    (shape === 'rectangle'
+      ? 'Dikdörtgenin iki karşı köşesine tıklayın.'
+      : 'Numune sınırına sırayla tıklayın (3–128 köşe). Son köşe ilkine otomatik bağlanır.') +
+    ` ${selectedPoints().length} köşe seçildi. Yeşil iç sınır hesaplamadan sonra gösterilir.`;
+}
+form.elements.roiShape.addEventListener('change', () => {
+  if (busy) return;
+  form.elements.roiPoints.value = '';
+  syncShapeControls();
+  dirty();
+  drawPreview();
+});
+for (const [id, clear] of [
+  ['undo-point', false],
+  ['clear-points', true],
+]) {
+  $('#' + id).addEventListener('click', () => {
+    if (busy) return;
+    const points = selectedPoints();
+    points.pop();
+    form.elements.roiPoints.value = JSON.stringify(clear ? [] : points);
+    syncShapeControls();
+    dirty();
+    drawPreview();
+  });
+}
+
 $('#estimate').addEventListener('change', () => {
   for (const key of ['windowMin', 'windowMax']) {
     form.elements[key].disabled = !$('#estimate').checked;
@@ -360,7 +443,7 @@ $('#estimate').addEventListener('change', () => {
   dirty();
 });
 form.addEventListener('input', (event) => {
-  if (event.target.matches('input:not([type=file])')) {
+  if (event.target.matches('input:not([type=file]):not([data-view-only])')) {
     dirty();
     drawPreview();
   }
@@ -509,12 +592,12 @@ async function chooseFiles(selection, fromFolder = false) {
     syncWorkflow();
   }
 }
-$('#choose-folder').addEventListener('click', () => folderInput.click());
 folderInput.addEventListener('change', () =>
   chooseFiles(folderInput.files, true),
 );
 if (!('webkitdirectory' in folderInput)) {
-  $('#choose-folder').disabled = true;
+  folderInput.disabled = true;
+  $('#choose-folder').setAttribute('aria-disabled', 'true');
   $('#folder-support').hidden = false;
 }
 fileInput.addEventListener('change', () => chooseFiles(fileInput.files));
@@ -543,6 +626,27 @@ function loadPreview(url) {
   };
   image.src = url;
 }
+async function loadDicomPreview(entry) {
+  const revision = previewRevision;
+  $('#preview-heading').textContent = 'Önizleme hazırlanıyor…';
+  $('#preview-message').textContent =
+    'Görüntü, ölçüm alanı seçilmeden de görüntülenebilir.';
+  try {
+    const body = new FormData();
+    body.set('file', entry.file);
+    const response = await fetch('/api/preview', { method: 'POST', body });
+    if (!response.ok) throw new Error(await readError(response));
+    const preview = await response.json();
+    entry.preview = preview;
+    if (activeId !== entry.id || previewRevision !== revision) return;
+    $('#image-badge').textContent = unitLabel(preview.unit);
+    loadPreview(preview.preview);
+  } catch (error) {
+    if (activeId !== entry.id || previewRevision !== revision) return;
+    $('#preview-heading').textContent = 'Önizleme açılamadı';
+    $('#preview-message').textContent = error.message;
+  }
+}
 function drawPreview() {
   if (!previewImage) return;
   const canvas = $('#image-canvas');
@@ -550,6 +654,37 @@ function drawPreview() {
   canvas.height = previewImage.height;
   const ctx = canvas.getContext('2d');
   ctx.drawImage(previewImage, 0, 0);
+  if (candidateOverlay && !resultDirty && $('#show-candidates').checked)
+    ctx.drawImage(candidateOverlay, 0, 0);
+  if (form.elements.roiShape.value !== 'circle') {
+    let points = selectedPoints();
+    if (form.elements.roiShape.value === 'rectangle' && points.length === 2) {
+      const [a, b] = points;
+      points = [
+        [a[0], a[1]],
+        [b[0], a[1]],
+        [b[0], b[1]],
+        [a[0], b[1]],
+      ];
+    }
+    ctx.lineWidth = Math.max(1, canvas.width / 350);
+    ctx.strokeStyle = '#ffb454';
+    ctx.fillStyle = '#ffb454';
+    if (points.length) {
+      ctx.beginPath();
+      ctx.moveTo(...points[0]);
+      for (const point of points.slice(1)) ctx.lineTo(...point);
+      if (points.length >= 3) ctx.closePath();
+      ctx.stroke();
+      for (const [x, y] of points) ctx.fillRect(x - 2, y - 2, 4, 4);
+    }
+    if (result && !resultDirty) {
+      ctx.fillStyle = '#50fa90';
+      for (const [x, y] of result.roi.innerBoundary || [])
+        ctx.fillRect(x - 0.5, y - 0.5, 1, 1);
+    }
+    return;
+  }
   const manual = $('#manual').checked;
   const roi = manual
     ? {
@@ -588,7 +723,11 @@ function drawPreview() {
   ctx.fillRect(roi.x - 4, roi.y - 1, 8, 2);
 }
 $('#image-canvas').addEventListener('click', (event) => {
-  if (!$('#manual').checked || busy) return;
+  if (
+    (!$('#manual').checked && form.elements.roiShape.value === 'circle') ||
+    busy
+  )
+    return;
   const canvas = event.currentTarget,
     rect = canvas.getBoundingClientRect();
   const scale = Math.min(
@@ -602,20 +741,35 @@ $('#image-canvas').addEventListener('click', (event) => {
     (event.clientY - rect.top - (rect.height - canvas.height * scale) / 2) /
     scale;
   if (x < 0 || y < 0 || x >= canvas.width || y >= canvas.height) return;
+  const shape = form.elements.roiShape.value;
+  if (shape !== 'circle') {
+    let points = selectedPoints();
+    if (shape === 'rectangle' && points.length >= 2) points = [];
+    if (points.length >= 128) {
+      showError('En fazla 128 köşe seçebilirsiniz.');
+      return;
+    }
+    points.push([Math.round(x), Math.round(y)]);
+    form.elements.roiPoints.value = JSON.stringify(points);
+    syncShapeControls();
+    dirty();
+    drawPreview();
+    return;
+  }
   form.elements.centerX.value = x.toFixed(1);
   form.elements.centerY.value = y.toFixed(1);
   dirty();
   drawPreview();
 });
 function requestBody() {
-  const body = new FormData(form);
-  body.set('file', file);
-  body.set('sourcePath', entryLabel(activeEntry()));
-  return body;
+  saveCurrent();
+  return bodyForEntry(activeEntry());
 }
 function setBusy(value) {
   busy = value;
   $('#analyze').disabled = value;
+  $('#undo-point').disabled = value;
+  $('#clear-points').disabled = value;
   $('#export').disabled = value;
   fileInput.disabled = value;
   $('#analyze span:first-child').textContent = value
@@ -624,7 +778,9 @@ function setBusy(value) {
   form.setAttribute('aria-busy', String(value));
   syncWorkflow();
   // Preserve the current field disabled state while a request is in progress.
-  for (const input of form.querySelectorAll('input:not([type=file])')) {
+  for (const input of form.querySelectorAll(
+    'input:not([type=file]), select[name=roiShape], select[name=materialReference]',
+  )) {
     if (value) {
       input.dataset.wasDisabled = String(input.disabled);
       input.disabled = true;
@@ -648,7 +804,13 @@ form.addEventListener('submit', async (event) => {
     showError('Önce bir kesit dosyası seçin.');
     return;
   }
-  const body = requestBody();
+  let body;
+  try {
+    body = requestBody();
+  } catch (error) {
+    showError(error.message);
+    return;
+  }
   resultDirty = true;
   activeEntry().error = null;
   activeEntry().processing = true;
@@ -694,7 +856,52 @@ function renderResults(updateCoordinates = true) {
       radius: result.roi.radius,
     }))
       form.elements[name].value = value.toFixed(3);
+  candidateOverlay = null;
+  if (result.defects) {
+    const renderedResult = result,
+      overlay = new Image();
+    overlay.onload = () => {
+      if (result === renderedResult) {
+        candidateOverlay = overlay;
+        drawPreview();
+      }
+    };
+    overlay.src = result.defects.overlay;
+  }
   loadPreview(result.preview);
+  const defects = result.defects;
+  $('#defect-summary').textContent = defects
+    ? `${defects.count} aday bölge; ${defects.elongatedCount} ince/uzamış aday. Aday alan oranı %${fmt(defects.percent, 2)}. Eşik: ${fmt(defects.threshold, 2)} ${unitLabel(result.unit)} (${defects.thresholdSource === 'user' ? 'elle seçilmiş' : 'otomatik öneri'}).${defects.truncated ? ' En büyük 50 bölge listeleniyor; toplamlar tüm adayları kapsar.' : ''}`
+    : 'Bu sonuç için aday bölge taraması bulunmuyor.';
+  $('#defect-regions').replaceChildren(
+    ...(defects?.regions || []).map((region, index) => {
+      const row = document.createElement('tr');
+      for (const value of [
+        index + 1,
+        region.elongated ? 'İnce/uzamış aday' : 'Düşük yoğunluk adayı',
+        integer(region.pixels),
+        fmt(region.area, 2),
+        fmt(region.mean),
+        `${region.bounds.width} × ${region.bounds.height}`,
+        region.widthMm === null
+          ? '—'
+          : `${fmt(region.widthMm, 2)} × ${fmt(region.heightMm, 2)}`,
+        region.touchesBoundary ? 'Evet; sınırı kontrol edin' : 'Hayır',
+      ]) {
+        const cell = document.createElement('td');
+        cell.textContent = value;
+        row.append(cell);
+      }
+      return row;
+    }),
+  );
+  $('#interpretation').replaceChildren(
+    ...(result.interpretation || []).map((text) => {
+      const p = document.createElement('p');
+      p.textContent = text;
+      return p;
+    }),
+  );
   const m = result.measurements[0];
   $('#metric-mean').textContent = fmt(m.mean);
   $('#metric-std').textContent = fmt(m.std);
@@ -881,7 +1088,30 @@ function bodyForEntry(entry) {
         entry.settings.values[key] === '' ||
         !Number.isFinite(Number(entry.settings.values[key])),
     );
-  if (entry.settings.manual && missing(['centerX', 'centerY', 'radius']))
+  const shape = entry.settings.values.roiShape || 'circle';
+  if (shape !== 'circle') {
+    let points;
+    try {
+      points = JSON.parse(entry.settings.values.roiPoints || '[]');
+    } catch {
+      points = [];
+    }
+    if (
+      shape === 'rectangle'
+        ? points.length !== 2
+        : points.length < 3 || points.length > 128
+    )
+      throw new Error(
+        shape === 'rectangle'
+          ? 'Dikdörtgenin iki karşı köşesini seçin.'
+          : 'Serbest alan için en az üç köşe seçin.',
+      );
+  }
+  if (
+    shape === 'circle' &&
+    entry.settings.manual &&
+    missing(['centerX', 'centerY', 'radius'])
+  )
     throw new Error(
       'Elle ölçüm için merkez X, merkez Y ve yarıçapı birlikte girin.',
     );
@@ -893,9 +1123,10 @@ function bodyForEntry(entry) {
   body.set('file', entry.file);
   body.set('sourcePath', entryLabel(entry));
   for (const key of optionNames) {
+    if (key === 'roiPoints' && shape === 'circle') continue;
     if (
       ['centerX', 'centerY', 'radius'].includes(key) &&
-      !entry.settings.manual
+      (!entry.settings.manual || shape !== 'circle')
     )
       continue;
     if (['windowMin', 'windowMax'].includes(key) && !entry.settings.estimate)

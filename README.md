@@ -37,6 +37,24 @@ Klasör seçimi tarayıcının kullanıcı tarafından seçilen dosyalarına day
 
 Sekmeler sol/sağ ok, Home ve End tuşlarıyla kullanılabilir. Önizlemedeki tam ekran düğmesiyle kesiti büyütebilir, **Kullanım rehberi** düğmesiyle kısa açıklamaları açabilirsiniz. Ölçüm notları sonuçlar bölümünde açılıp kapatılabilir. Arayüz masaüstü ve mobil ekranlara uyarlanır.
 
+## Alan seçimi ve sayısal değerlendirme
+
+Daireye ek olarak dikdörtgen ve serbest çokgen seçilebilir. Ölçüm ayarlarında şekli seçin; dikdörtgen için iki karşı köşeye, çokgen için sınır boyunca en az üç noktaya tıklayın. Köşeler en yakın piksel koordinatına oturtulur. Çokgen en fazla 128 köşelidir; kendini kesen veya alanı sıfır seçimler reddedilir. Her dosyanın şekli ve köşeleri ayrı korunur. Otomatik öneri şu anda yalnızca daire içindir; diğer şekiller kullanıcı tarafından çizilir.
+
+Kenar payı, çokgen/dikdörtgen içinde en yakın kenara olan Öklid uzaklığıyla uygulanır. Geçerli piksel merkezleri kullanılır; bu nedenle alan, sürekli çokgen alanından küçük bir miktar farklı olabilir. Anizotropik piksellerde fiziksel kenar payı küçük piksel boyutuna göre piksele çevrilir ve uyarı verilir. Üst/alt ve sol/sağ bölgeler şeklin sınırlayıcı kutusunun merkeziyle ayrılır; r/4 ve r/2 merkez bölgeleri yalnızca daire içindir, diğer şekillerde boş gösterilir. Yeşil sınır hesaplanan gerçek iç piksel maskesini gösterir.
+
+Sayısal değerlendirme ortalama, standart sapma, yüzdelikler ve yarılar arasındaki farkları açıklar. İsteğe bağlı düşük yoğunluk eşiği, eşik ve altındaki geçerli piksel oranını verir. Bu alan oranı, doğrulanmış porozite veya hacimsel boşluk ölçümü değildir. Homojenlik/uygunluk kararı için malzeme ve kabul sınırları gerekir. Dosyalar arasındaki aralık yalnızca aynı birimlerde sunulur; aynı numune, çekim ve alan koşulları ayrıca doğrulanmalıdır. DICOM ImageType içindeki türetilmiş/yeniden formatlanmış/ortalama/izdüşüm etiketleri sonuçlarda uyarı olarak gösterilir. Açıklamalar sayısal kurallardan üretilir; harici yapay zekâ servisine görüntü gönderilmez.
+
+## Materyal referansı ve yarık adayları
+
+Materyal referansı olarak paylaşılan Excel örneği (mermer, 100 kV) seçilebilir. Referansın kenar paylı örnek ortalaması −238,5 HU, standart sapması 400 HU'dur. Bunlar yeni görüntüye dayatılan hedefler veya kabul sınırları değildir; yeni sonuçlar her dosyanın kendi DICOM piksellerinden hesaplanır. Karşılaştırma yalnızca gerçek HU sonuçlarında sunulur. Görüntü türü türetilmiş/ortalama/izdüşüm ise farkların doğrudan eşdeğer değerlendirilemeyeceği belirtilir.
+
+Düşük yoğunluk aday taraması yalnızca seçilen iç alandaki geçerli piksellere uygulanır. Kullanıcı eşik belirtmediyse `medyan − max(1, 3 × 1,4826 × MAD)` kullanılır; MAD, medyandan mutlak sapmaların medyanıdır. Bu keşif amaçlı bir eşik önerisidir, mermer için kalibre edilmiş yarık eşiği değildir. Sekiz komşulukla bağlı en az üç piksellik bölgeler aday kabul edilir. Fiziksel piksel boyutlarıyla hesaplanan ikinci moment eksen oranı en az 3 olan ve piksel kutusunun uzun kenarı en az 6 piksel olan bölgeler “ince/uzamış aday” olarak ayrılır. 1/2 piksellik bölgeler gürültü bastırma amacıyla sayılmaz. Ölçüm alanı sınırına değen bölgeler ayrıca işaretlenir.
+
+Aday sayısı, piksel alanı ve oranı, varsa mm² alan, ortalama, kapsayan kutunun piksel/mm boyutları raporlanır. Kutunun boyutu gerçek yarık genişliği veya uzunluğu değildir. Pembe katman aday pikselleri gösterir; yalnızca görünümü açıp kapatmak ölçümü değiştirmez. En büyük 50 bölge tabloda listelenir; toplamlar ve görüntü katmanı tüm adayları kapsar. Tekil ve toplu Excel'e işaretli görüntü ve aday bilgileri eklenir.
+
+Bu yöntem gözenek, mineral/doku değişimi, kısmi hacim etkisi ve artefaktları yarıktan kesin ayıramaz. Bulunmayan bir aday, yarık bulunmadığını kanıtlamaz; aday alan oranı 3B porozite değildir. Etiketli sağlam/yarıklı referans kesitler olmadan duyarlılık/özgüllük veya doğruluk yüzdesi iddia edilmez. Harici görsel yapay zekâ modeli henüz kullanılmıyor.
+
 ## Ölçümler
 
 - Kenar payı uygulanmış numune, tam numune ve tüm geçerli görüntü için piksel sayısı, alan, ortalama, popülasyon standart sapması, medyan, minimum, maksimum ve %5/%95 yüzdelikleri.
@@ -61,6 +79,7 @@ Girdi sınırları: dosya başına 20 MB, varsayılan 16.777.216 piksel (4096 ×
 
 ## API
 
+- `POST /api/preview`: `multipart/form-data`, `file` alanı. Ölçüm alanı seçmeden PNG önizlemesi, boyut ve birim bilgisi döndürür. Otomatik çember bulunamayan DICOM dosyaları da önizlenebilir.
 - `POST /api/analyze`: `multipart/form-data`, `file` alanı ve isteğe bağlı ölçüm ayarları. JSON sonuç döndürür.
 - `POST /api/export`: Aynı dosya ve ayarları alır; XLSX raporu döndürür.
 - `GET /health`: `{ "status": "ok" }`.
@@ -69,6 +88,10 @@ Girdi sınırları: dosya başına 20 MB, varsayılan 16.777.216 piksel (4096 ×
 
 | Alanlar | Açıklama |
 | --- | --- |
+| `roiShape` | `circle` (varsayılan), `rectangle`, `polygon` |
+| `roiPoints` | JSON `[x,y]` dizisi; dikdörtgen için iki karşı köşe, çokgen için 3–128 köşe |
+| `materialReference` | `marble-excel` veya `none`; hesaplanan HU değiştirilmez |
+| `lowDensityThreshold` | İsteğe bağlı eşik; birimi sonuçla aynıdır, eşik ve altı sayılır |
 | `sourcePath` | İsteğe bağlı göreli dosya yolu; yalnızca sonuç/rapor etiketi olarak kullanılır |
 | `centerX`, `centerY`, `radius` | Elle ROI; üçü birlikte, piksel cinsinden |
 | `insetPixels` | Sıfır veya pozitif kenar payı |
@@ -89,13 +112,13 @@ npm run test:e2e
 npm run test:workflow
 ```
 
-Tarayıcı testleri Google Chrome kullanır ve kendi sunucusunu 3100 portunda başlatıp kapatır. Chrome yerine Playwright Chromium kullanmak için önce `npx playwright install chromium`, sonra `PLAYWRIGHT_CHANNEL=chromium npm run test:workflow` çalıştırın. Test portu `WORKFLOW_TEST_PORT` ile değiştirilebilir. Hata ekranları ve izler, Git'e alınmayan `test-results/` dizininde tutulur. Test verileri sentetiktir; kullanıcının dosyaları kullanılmaz.
+Tarayıcı testleri Google Chrome kullanır ve kendi sunucusunu 3100 portunda başlatıp kapatır. Chrome yerine Playwright Chromium kullanmak için önce `npx playwright install chromium`, sonra `PLAYWRIGHT_CHANNEL=chromium npm run test:workflow` çalıştırın. Safari’nin WebKit motoruyla kontrol için `npx playwright install webkit`, ardından `PLAYWRIGHT_BROWSER=webkit npm run test:workflow` kullanın. Test portu `WORKFLOW_TEST_PORT` ile değiştirilebilir. Hata ekranları ve izler, Git'e alınmayan `test-results/` dizininde tutulur. Test verileri sentetiktir; kullanıcının dosyaları kullanılmaz.
 
 [Akış denetimi ve bulunan hatalar](docs/flow-audit.md) dosyasında senaryolar, sayısal karşılaştırmalar ve doğrulamanın sınırları açıklanır.
 
 Testler bilinen sayısal istatistikleri, sentetik daire seçimini, gri ton / yaklaşık HU ayrımını, DICOM signed piksel dönüşümünü, padding dışlamasını, alan hesabını, geçersiz girdi hatalarını ve gerçek XLSX üretimini doğrular. HTTP testleri geçici yerel port açar.
 
-Ek olarak Chrome’da çoklu dosya seçimi, bağımsız ROI ve kalibrasyon ayarları, hata izolasyonu, tek dosya yeniden denemesi, toplu Excel’de birim/sayfa/önizleme doğruluğu, eski ölçümlerin dışlanması ve 320–1440 px genişliklerde üç aşamalı akış kontrol edildi. Klasör seçimi ayrıca gerçek iç içe test klasörüyle; uzantısız DICOM, aynı adlı dosyalar, filtreleme, tekrar seçim ve Excel yol bilgileri açısından doğrulandı. Gerçek özgün DICOM dosyası henüz sağlanmadığı için o dosyayla referans doğrulaması yapılmadı.
+Ek olarak Chrome’da çoklu dosya seçimi, bağımsız ROI ve kalibrasyon ayarları, hata izolasyonu, tek dosya yeniden denemesi, toplu Excel’de birim/sayfa/önizleme doğruluğu, eski ölçümlerin dışlanması ve 320–1440 px genişliklerde üç aşamalı akış kontrol edildi. Klasör seçimi ayrıca gerçek iç içe test klasörüyle; uzantısız DICOM, aynı adlı dosyalar, filtreleme, tekrar seçim ve Excel yol bilgileri açısından doğrulandı. Paylaşılan 60 gerçek DICOM dosyasında bağımsız piksel ve istatistik doğrulaması [ayrı raporda](docs/dicom-validation-2026-11-02.md) bulunur; bu rapor önceki dairesel alan sürümüne aittir. Malzeme için bilinen fiziksel referans ölçümler sağlanmadığından cihaz kalibrasyonu veya bilimsel kabul doğrulaması yapılmadı.
 
 ## Yapı
 

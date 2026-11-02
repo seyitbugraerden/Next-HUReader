@@ -1942,6 +1942,27 @@ select {
 .folder-picker .secondary {
   gap: 8px;
 }
+#choose-folder {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+#choose-folder input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: inherit;
+}
+#choose-folder:focus-within {
+  outline: 3px solid #6ac8be;
+  outline-offset: 3px;
+}
+#choose-folder[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
 .folder-picker .icon {
   width: 15px;
   height: 15px;

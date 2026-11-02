@@ -189,3 +189,12 @@ describe('DICOM decoding', () => {
     ).rejects.toThrow('RescaleSlope');
   });
 });
+
+it('identifies derived averaged DICOM images without treating them as original slices', async () => {
+  const image = await decodeImage(
+    dicomFixture({ imageType: 'DERIVED\\SECONDARY\\REFORMATTED\\AVERAGE' }),
+    {},
+  );
+  expect(image.metadata['Görüntü türü']).toContain('AVERAGE');
+  expect(image.warnings.some((w) => w.includes('özgün kesitlerle'))).toBe(true);
+});

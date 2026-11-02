@@ -207,8 +207,10 @@ function decodeDicom(buffer: Buffer): ImageData {
     space.length === 2 && space.every((v) => Number.isFinite(v) && v > 0)
       ? [space[1]!, space[0]!]
       : null;
+  const imageType = ds.string('x00080008') ?? '';
   const metadata: ImageData['metadata'] = {
     Kaynak: 'CT DICOM',
+    ...(imageType ? { 'Görüntü türü': imageType } : {}),
     'Rescale Slope': slope,
     'Rescale Intercept': intercept,
     'Görüntü penceresi': '−1000 … +1000 HU',
@@ -237,6 +239,11 @@ function decodeDicom(buffer: Buffer): ImageData {
     spacing,
     metadata,
     warnings: [
+      ...(/DERIVED|REFORMATTED|AVERAGE|LOCALIZER|PROJECTION/.test(imageType)
+        ? [
+            'Bu DICOM türetilmiş/yeniden biçimlendirilmiş veya izdüşüm görüntüsü olarak etiketlenmiş. Ortalama ve dağılımları özgün kesitlerle doğrudan eşdeğer kabul etmeyin.',
+          ]
+        : []),
       ...(spacing ? [] : ['DICOM piksel boyutu eksik; mm² hesaplanmadı.']),
       ...(rescaleType
         ? []

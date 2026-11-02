@@ -36,9 +36,8 @@ test('per-file geometry, calibration, stale results and both Excel reports remai
       responses.push(response.json());
   });
   await page.route('**/api/analyze', async (route) => {
-    const response = await route.fetch();
     await new Promise((resolve) => setTimeout(resolve, 120));
-    await route.fulfill({ response });
+    await route.continue();
   });
   await page.goto('/');
   await expect(page.locator('#step-analyze')).toBeDisabled();
@@ -179,6 +178,28 @@ test('per-file geometry, calibration, stale results and both Excel reports remai
   expect(errors).toEqual([]);
 });
 
+test('extensionless DICOM can be previewed before a successful analysis', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.locator('#file').setInputFiles({
+    name: 'Z01',
+    mimeType: 'application/octet-stream',
+    buffer: dicomFixture(),
+  });
+  await page.locator('#go-analyze').click();
+  await expect(page.locator('#image-canvas')).toBeVisible();
+  await expect(page.locator('#dimensions')).toHaveText('8 × 8 px');
+  await expect(page.locator('#image-badge')).toHaveText('HU');
+  await expect(page.locator('#results')).toBeHidden();
+  await page.locator('#analyze').click();
+  await expect(page.locator('#error')).toContainText('Dairesel numune');
+  await expect(page.locator('#image-canvas')).toBeVisible();
+  await manualSettings(page, '1');
+  await page.locator('#analyze').click();
+  await expect(page.locator('#metric-mean')).toHaveText('-24,0');
+});
+
 test('folder paths and extensionless DICOM survive selection, reimport and reports', async ({
   page,
 }, info) => {
@@ -250,4 +271,112 @@ test('folder paths and extensionless DICOM survive selection, reimport and repor
   await expect(page.locator('#go-analyze')).toBeDisabled();
   await expect(page.locator('#step-report')).toBeDisabled();
   await expect(page.locator('#queue-card')).toBeHidden();
+});
+
+test('flat and irregular samples use rectangle and polygon areas in the UI and Excel', async ({
+  page,
+}, info) => {
+  await page.goto('/');
+  await page.locator('#file').setInputFiles({
+    name: 'flat-CT',
+    mimeType: 'application/octet-stream',
+    buffer: dicomFixture(),
+  });
+  await page.locator('#go-analyze').click();
+  await expect(page.locator('#image-canvas')).toBeVisible();
+  await page.locator('#image-canvas').evaluate((canvas: HTMLCanvasElement) => {
+    canvas.style.width = '256px';
+    canvas.style.height = '256px';
+  });
+  const clickPixel = async (x: number, y: number) => {
+    const point = await page.locator('#image-canvas').evaluate(
+      (canvas: HTMLCanvasElement, p) => {
+        const rect = canvas.getBoundingClientRect();
+        const scale = Math.min(
+          rect.width / canvas.width,
+          rect.height / canvas.height,
+        );
+        return {
+          x: rect.left + (rect.width - canvas.width * scale) / 2 + p.x * scale,
+          y: rect.top + (rect.height - canvas.height * scale) / 2 + p.y * scale,
+        };
+      },
+      { x, y },
+    );
+    await page.mouse.click(Math.round(point.x), Math.round(point.y));
+  };
+  await page.locator('#roi-shape').selectOption('rectangle');
+  await page.locator('input[name=insetPixels]').fill('1');
+  await clickPixel(2, 2);
+  await clickPixel(6, 6);
+  await page.locator('#analyze').click();
+  await expect(page.locator('#error')).toBeHidden();
+  await expect(page.locator('#metric-count')).toHaveText('9');
+  await expect(page.locator('#interpretation')).toContainText('standart sapma');
+  await page.locator('#roi-shape').selectOption('polygon');
+  for (const [x, y] of [
+    [1, 1],
+    [6, 1],
+    [6, 3],
+    [3, 3],
+    [3, 6],
+    [1, 6],
+  ])
+    await clickPixel(x!, y!);
+  await page.locator('#analyze').click();
+  await expect(page.locator('#metric-count')).toHaveText('7');
+  await page.locator('#go-report').click();
+  const download = page.waitForEvent('download');
+  await page.locator('#export-batch').click();
+  const path = info.outputPath('polygon.xlsx');
+  await (await download).saveAs(path);
+  const book = new ExcelJS.Workbook();
+  await book.xlsx.readFile(path);
+  expect(book.getWorksheet('Ölçüm Alanı')!.getCell(2, 9).value).toBe('polygon');
+  expect(book.getWorksheet('Ölçüm Alanı')!.getImages()).toHaveLength(1);
+});
+
+test('candidate overlays can be inspected without invalidating the measurement', async ({
+  page,
+}) => {
+  const { default: sharp } = await import('sharp');
+  const pixels = Buffer.alloc(64 * 64, 180);
+  for (let y = 10; y < 40; y++) pixels[y * 64 + 20] = 0;
+  const buffer = await sharp(pixels, {
+    raw: { width: 64, height: 64, channels: 1 },
+  })
+    .png()
+    .toBuffer();
+  await page.goto('/');
+  await page
+    .locator('#file')
+    .setInputFiles({ name: 'line.png', mimeType: 'image/png', buffer });
+  await page.locator('#go-analyze').click();
+  await page.locator('#manual').check();
+  for (const [name, value] of Object.entries({
+    centerX: '32',
+    centerY: '32',
+    radius: '30',
+    insetPixels: '1',
+  }))
+    await page.locator(`input[name=${name}]`).fill(value);
+  await page.locator('#analyze').click();
+  await expect(page.locator('#defect-summary')).toContainText(
+    '1 aday bölge; 1 ince/uzamış aday',
+  );
+  const redAtLine = () =>
+    page
+      .locator('#image-canvas')
+      .evaluate(
+        (canvas: HTMLCanvasElement) =>
+          canvas.getContext('2d')!.getImageData(20, 20, 1, 1).data[0],
+      );
+  await expect.poll(redAtLine).toBeGreaterThan(0);
+  await page.locator('#show-candidates').uncheck();
+  await expect.poll(redAtLine).toBe(0);
+  await expect(page.locator('#go-report')).toBeEnabled();
+  await page.locator('#show-candidates').check();
+  await expect.poll(redAtLine).toBeGreaterThan(0);
+  await page.locator('#go-report').click();
+  await expect(page.locator('#export')).toBeEnabled();
 });

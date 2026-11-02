@@ -19,13 +19,27 @@ import { AnalysisService, parseOptions } from './analysis.service.js';
     limits: {
       fileSize: 20 * 1024 * 1024,
       files: 1,
-      fields: 9,
-      fieldSize: 4096,
+      fields: 13,
+      fieldSize: 16384,
     },
   }),
 )
 export class AnalysisController {
   constructor(private readonly analysis: AnalysisService) {}
+
+  @Post('preview')
+  async preview(
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Res() response: Response,
+  ) {
+    if (!file?.buffer.length)
+      throw new BadRequestException(
+        'Önizleme için bir görüntü dosyası yükleyin.',
+      );
+    const preview = await this.analysis.preview(file.buffer);
+    response.setHeader('Cache-Control', 'no-store');
+    return response.json(preview);
+  }
 
   private analyze(
     file: Express.Multer.File | undefined,

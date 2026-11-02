@@ -172,29 +172,28 @@
                       >DICOM · PNG · JPG
                       <span class="format-divider">/</span> Dosya başına 20
                       MB</small
-                    ><input
-                      id="file"
-                      name="file"
-                      type="file"
-                      multiple
-                      accept=".dcm,.dicom,.ima,application/dicom,image/png,image/jpeg"
+                    ><input id="file" name="file" type="file" multiple
                   /></label>
                   <div class="folder-picker">
-                    <button id="choose-folder" class="secondary" type="button">
-                      <svg class="icon"><use href="#i-upload" /></svg>Klasör seç</button
-                    ><span>Alt klasörler dahil taranır.</span
-                    ><input
-                      id="folder"
-                      type="file"
-                      webkitdirectory
-                      multiple
-                      hidden
-                      aria-label="İncelenecek klasörü seçin"
-                    />
+                    <label id="choose-folder" class="secondary" for="folder">
+                      <svg class="icon"><use href="#i-upload" /></svg>Klasör
+                      seç<input
+                        id="folder"
+                        type="file"
+                        webkitdirectory
+                        directory
+                        multiple
+                        aria-label="İncelenecek klasörü seçin" /></label
+                    ><span>Alt klasörler dahil taranır.</span>
                   </div>
                   <p id="folder-support" class="quiet" hidden>
                     Tarayıcınız klasör seçimini desteklemiyor. Dosyaları çoklu
                     seçimle ekleyebilirsiniz.
+                  </p>
+                  <p class="quiet">
+                    Safari’de klasörü onaylayamıyorsanız dosya seçimini açın,
+                    klasörün içine girin ve ⌘A ile dosyaları seçin. Uzantısız
+                    DICOM dosyaları da eklenebilir.
                   </p>
                   <div
                     id="import-summary"
@@ -320,6 +319,53 @@
                     <h2>Ölçüm ayarları</h2>
                     <span class="section-meta">ROI</span>
                   </div>
+                  <label class="field"
+                    >Ölçüm alanı şekli
+                    <select id="roi-shape" name="roiShape">
+                      <option value="circle">Daire</option>
+                      <option value="rectangle">Dikdörtgen</option>
+                      <option value="polygon">Serbest çokgen</option>
+                    </select>
+                  </label>
+                  <label class="field"
+                    >Materyal referansı
+                    <select name="materialReference" id="material-reference">
+                      <option value="marble-excel">
+                        Mermer — paylaşılan Excel
+                      </option>
+                      <option value="none">
+                        Referans karşılaştırması yapma
+                      </option>
+                    </select>
+                  </label>
+                  <p class="quiet">
+                    Excel’in örnek sonuçları hedef değer değildir. Her görüntü
+                    kendi piksellerinden hesaplanır; referans farkı tek başına
+                    kusur anlamına gelmez.
+                  </p>
+                  <label class="check-row"
+                    ><input
+                      id="show-candidates"
+                      type="checkbox"
+                      checked
+                      data-view-only
+                    /><span
+                      >Düşük yoğunluk adaylarını göster<small
+                        >Pembe işaretler kesin yarık veya boşluk tanısı
+                        değildir.</small
+                      ></span
+                    ></label
+                  >
+                  <input type="hidden" name="roiPoints" disabled />
+                  <div id="polygon-tools" hidden>
+                    <p id="roi-guidance" class="quiet"></p>
+                    <button id="undo-point" class="secondary" type="button">
+                      Son köşeyi geri al
+                    </button>
+                    <button id="clear-points" class="secondary" type="button">
+                      Alanı temizle
+                    </button>
+                  </div>
                   <label class="check-row"
                     ><input id="manual" type="checkbox" /><span
                       >Ölçüm alanını elle belirle<small
@@ -327,7 +373,7 @@
                       ></span
                     ></label
                   >
-                  <div class="grid-three">
+                  <div class="grid-three" id="circle-fields">
                     <label
                       >Merkez X <span>px</span
                       ><input
@@ -369,6 +415,20 @@
                   <p class="quiet">
                     Kenar bulanıklığı ve destek etkisini azaltmak için numune
                     sınırı içeri alınır.
+                  </p>
+                  <label class="field"
+                    >Düşük yoğunluk eşiği (isteğe bağlı)
+                    <input
+                      name="lowDensityThreshold"
+                      type="number"
+                      step="any"
+                      placeholder="Görüntünün ölçüm biriminde"
+                    />
+                  </label>
+                  <p class="quiet">
+                    Eşik ve altındaki piksel oranı raporlanır. Eşik malzemeye
+                    göre belirlenmelidir; sonuç otomatik boşluk/porozite tanısı
+                    değildir.
                   </p>
                   <details>
                     <summary>
@@ -457,8 +517,10 @@
                         <svg class="icon"><use href="#i-scan" /></svg>
                       </div>
                       <span class="empty-overline">KESİT GÖRÜNTÜLEYİCİ</span>
-                      <h3>Analiz için bir görüntü yükleyin</h3>
-                      <p>
+                      <h3 id="preview-heading">
+                        Analiz için bir görüntü yükleyin
+                      </h3>
+                      <p id="preview-message">
                         Dosyanızı yüklediğinizde kesit burada görünür.<br />Numune
                         sınırını kontrol ederek ölçüme başlayın.
                       </p>
@@ -494,7 +556,7 @@
                 >
                   <b>Ölçüm hazır. Alanı kontrol edin.</b>
                   <p>
-                    Yeşil çemberin numunenin içinde kaldığını doğrulayın.
+                    Yeşil ölçüm alanının numunenin içinde kaldığını doğrulayın.
                     Gerekirse ayarları değiştirip tekrar hesaplayın.
                   </p>
                 </div>
@@ -537,6 +599,7 @@
                 </button>
               </div>
               <p id="batch-report-note" class="quiet"></p>
+              <p id="comparison-summary" class="quiet"></p>
               <div class="table-scroll">
                 <table>
                   <thead>
@@ -559,6 +622,42 @@
               ></label>
             </div>
             <div id="results">
+              <section class="card" style="padding: 20px; margin-bottom: 20px">
+                <h2>Sayısal değerlendirme</h2>
+                <div id="interpretation"></div>
+                <h3>Yarık / düşük yoğunluk adayları</h3>
+                <p id="defect-summary"></p>
+                <p class="quiet">
+                  Tarama yalnızca seçili iç alanı kapsar. 8 komşulukla bağlı, en
+                  az 3 piksellik koyu bölgeler listelenir. “İnce/uzamış” bir
+                  şekil ölçütüdür; yarık doğrulaması değildir. Eşik otomatik
+                  öneriyse medyan − 3 × 1,4826 × MAD kullanılır (en az 1 birim
+                  fark). Sonuçların gerçek yarıklarla eşleşmesi henüz
+                  doğrulanmamıştır.
+                </p>
+                <div class="table-scroll">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Aday</th>
+                        <th>Şekil</th>
+                        <th>Piksel</th>
+                        <th>Alan (mm²)</th>
+                        <th>Ortalama</th>
+                        <th>Kutu (px)</th>
+                        <th>Kutu (mm)</th>
+                        <th>Sınıra temas</th>
+                      </tr>
+                    </thead>
+                    <tbody id="defect-regions"></tbody>
+                  </table>
+                </div>
+                <p class="quiet">
+                  Bu açıklamalar hesaplanan ölçümlerden üretilir. Malzeme türü,
+                  doğru numune alanı ve kabul sınırları doğrulanmadan uygunluk
+                  veya boşluk kararı verilmez.
+                </p>
+              </section>
               <div class="results-heading">
                 <div>
                   <div class="eyebrow">ANALİZ SONUÇLARI</div>

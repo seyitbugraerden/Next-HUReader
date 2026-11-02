@@ -7,6 +7,7 @@ export function dicomFixture(
     slope?: string;
     intercept?: string;
     frames?: string;
+    imageType?: string;
   } = {},
 ): Buffer {
   function element(
@@ -49,6 +50,7 @@ export function dicomFixture(
       'UI',
       options.compressed ? '1.2.840.10008.1.2.4.50' : '1.2.840.10008.1.2.1',
     ),
+    ...(options.imageType ? [text(8, 0x08, 'CS', options.imageType)] : []),
     text(8, 0x60, 'CS', 'CT'),
     number(0x28, 2, 1),
     text(0x28, 4, 'CS', 'MONOCHROME2'),

@@ -24,6 +24,32 @@ describe('Analysis HTTP API', () => {
       .field('centerY', '4')
       .field('radius', '3')
       .field('insetPixels', '1');
+  it('previews DICOM without requiring an automatic ROI or returning patient data', async () => {
+    const file = dicomFixture();
+    await request(app.getHttpServer())
+      .post('/api/analyze')
+      .attach('file', file, { filename: 'Z01' })
+      .expect(400);
+    const res = await request(app.getHttpServer())
+      .post('/api/preview')
+      .attach('file', file, { filename: 'Z01' })
+      .expect(201);
+    expect(res.headers['cache-control']).toBe('no-store');
+    expect(res.body).toMatchObject({ width: 8, height: 8, unit: 'HU' });
+    expect(res.body).not.toHaveProperty('metadata');
+    expect(res.body).not.toHaveProperty('measurements');
+    const png = Buffer.from(res.body.preview.split(',')[1], 'base64');
+    expect(await sharp(png).metadata()).toMatchObject({
+      format: 'png',
+      width: 8,
+      height: 8,
+    });
+    await request(app.getHttpServer()).post('/api/preview').expect(400);
+    await request(app.getHttpServer())
+      .post('/api/preview')
+      .attach('file', Buffer.from('broken'), { filename: 'Z01' })
+      .expect(400);
+  });
   it('returns a usable DICOM measurement and omits patient data', async () => {
     const res = await upload()
       .attach('file', dicomFixture(), { filename: 'Z01.dcm' })
@@ -44,6 +70,138 @@ describe('Analysis HTTP API', () => {
       .expect(201);
     expect(res.body.unit).toBe('gray');
     expect(res.body.measurements[0].mean).toBe(100);
+  });
+  it('measures rectangular and concave areas with an inward margin', async () => {
+    const data = Buffer.from(
+      Array.from({ length: 64 }, (_, i) => (i % 8) + 10 * Math.floor(i / 8)),
+    );
+    const image = await sharp(data, {
+      raw: { width: 8, height: 8, channels: 1 },
+    })
+      .png()
+      .toBuffer();
+    const measure = (shape: string, points: number[][]) =>
+      request(app.getHttpServer())
+        .post('/api/analyze')
+        .field('roiShape', shape)
+        .field('roiPoints', JSON.stringify(points))
+        .field('insetPixels', '1')
+        .field('spacingX', '2')
+        .field('spacingY', '3')
+        .field('lowDensityThreshold', '44')
+        .attach('file', image, 'ramp.png');
+    const rectangle = await measure('rectangle', [
+      [2, 2],
+      [6, 6],
+    ]).expect(201);
+    expect(rectangle.body.measurements[0]).toMatchObject({
+      count: 9,
+      mean: 44,
+      area: 54,
+      min: 33,
+      max: 55,
+      median: 44,
+    });
+    expect(rectangle.body.measurements[0].std).toBeCloseTo(Math.sqrt(202 / 3));
+    expect(rectangle.body.measurements[1].count).toBe(25);
+    expect(rectangle.body.lowDensity.count).toBe(5);
+    expect(rectangle.body.lowDensity.percent).toBeCloseTo(500 / 9);
+    expect(rectangle.body.regions[4]).toMatchObject({ count: 0, mean: null });
+    const polygon = await measure('polygon', [
+      [1, 1],
+      [6, 1],
+      [6, 3],
+      [3, 3],
+      [3, 6],
+      [1, 6],
+    ]).expect(201);
+    expect(polygon.body.measurements[1].count).toBe(27);
+    expect(polygon.body.measurements[0].count).toBe(7);
+    expect(polygon.body.measurements[0].mean).toBeCloseTo(220 / 7);
+    expect(polygon.body.roi.innerBoundary.length).toBeGreaterThan(0);
+    await measure('polygon', [
+      [1, 1],
+      [6, 6],
+      [1, 6],
+      [6, 1],
+    ]).expect(400);
+    await measure('polygon', [
+      [1, 1],
+      [9, 1],
+      [1, 6],
+    ]).expect(400);
+    await measure('rectangle', [
+      [2, 2],
+      [2, 6],
+    ]).expect(400);
+    await request(app.getHttpServer())
+      .post('/api/export')
+      .field('roiShape', 'polygon')
+      .field(
+        'roiPoints',
+        JSON.stringify([
+          [1, 1],
+          [6, 1],
+          [6, 3],
+          [3, 3],
+          [3, 6],
+          [1, 6],
+        ]),
+      )
+      .field('insetPixels', '1')
+      .attach('file', image, 'ramp.png')
+      .expect(201);
+  });
+  it('reports and visualizes a synthetic dark line without calling it a confirmed crack', async () => {
+    const pixels = Buffer.alloc(64 * 64, 180);
+    for (let y = 10; y < 40; y++) pixels[y * 64 + 20] = 0;
+    const image = await sharp(pixels, {
+      raw: { width: 64, height: 64, channels: 1 },
+    })
+      .png()
+      .toBuffer();
+    const res = await request(app.getHttpServer())
+      .post('/api/analyze')
+      .field('roiShape', 'rectangle')
+      .field('roiPoints', '[[5,5],[58,58]]')
+      .field('insetPixels', '2')
+      .field('spacingX', '.5')
+      .field('spacingY', '.5')
+      .field('materialReference', 'marble-excel')
+      .attach('file', image, 'line.png')
+      .expect(201);
+    expect(res.body.defects).toMatchObject({
+      count: 1,
+      elongatedCount: 1,
+      pixels: 30,
+      area: 7.5,
+      thresholdSource: 'robust',
+    });
+    expect(res.body.defects.regions[0]).toMatchObject({
+      mean: 0,
+      widthMm: 0.5,
+      heightMm: 15,
+    });
+    expect(res.body.materialReference).toBeUndefined();
+    expect(res.body.warnings.some((w: string) => w.includes('gerçek HU'))).toBe(
+      true,
+    );
+    expect(res.body.interpretation.join(' ')).toContain(
+      'doğrulanmış yarık sayısı değildir',
+    );
+    const overlay = await sharp(
+      Buffer.from(res.body.defects.overlay.split(',')[1], 'base64'),
+    )
+      .raw()
+      .toBuffer();
+    expect(overlay[(10 * 64 + 20) * 4 + 3]).toBe(150);
+    expect(overlay[(10 * 64 + 19) * 4 + 3]).toBe(0);
+    const reference = await upload()
+      .field('materialReference', 'marble-excel')
+      .attach('file', dicomFixture(), 'CT')
+      .expect(201);
+    expect(reference.body.materialReference.meanDifferenceHU).toBe(214.5);
+    expect(reference.body.measurements[0].mean).toBe(-24);
   });
   it('downloads a real Excel archive', async () => {
     const res = await upload('/api/export')
