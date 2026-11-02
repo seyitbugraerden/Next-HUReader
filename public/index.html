@@ -231,6 +231,19 @@
                       <span aria-hidden="true">×</span> Tüm görselleri kaldır
                     </button>
                   </div>
+                  <div class="wizard-actions">
+                    <p id="upload-guidance">
+                      Devam etmek için bir görüntü seçin.
+                    </p>
+                    <button
+                      id="go-analyze"
+                      class="primary"
+                      type="button"
+                      disabled
+                    >
+                      <span>Ölçüm ayarlarına geç</span><span>→</span>
+                    </button>
+                  </div>
                   <p class="quiet privacy-note">
                     <svg class="icon"><use href="#i-shield" /></svg>Dosyalar
                     sunucunun belleğinde işlenir; diske kaydedilmez.
@@ -311,12 +324,6 @@
                 </ul>
               </div>
             </div>
-            <div class="wizard-actions">
-              <p id="upload-guidance">Devam etmek için bir görüntü seçin.</p>
-              <button id="go-analyze" class="primary" type="button" disabled>
-                <span>Ölçüm ayarlarına geç</span><span>→</span>
-              </button>
-            </div>
           </section>
           <section
             id="panel-analyze"
@@ -364,17 +371,71 @@
                     <span class="number">02</span>
                     <h2>Numuneyi kontrol edin</h2>
                   </div>
-                  <label class="field"
-                    >Numunenin şekli
-                    <select id="roi-shape" name="roiShape">
-                      <option value="circle">Otomatik numune alanı</option>
-                      <option value="rectangle">
-                        Yassı / dikdörtgen — alanı çiz
-                      </option>
-                      <option value="polygon">Düzensiz — sınırı çiz</option>
-                    </select>
-                  </label>
-                  <label class="check-row"
+                  <p class="settings-intro">
+                    Ölçüm alanını seçin, görüntü üzerinde doğrulayın ve
+                    hesaplayın.
+                  </p>
+                  <fieldset class="shape-picker" aria-describedby="shape-help">
+                    <legend>Alan seçim yöntemi</legend>
+                    <div class="shape-options">
+                      <label class="shape-option">
+                        <input
+                          type="radio"
+                          name="roiShape"
+                          value="circle"
+                          checked
+                        />
+                        <span class="shape-option-content">
+                          <svg
+                            class="shape-option-icon"
+                            aria-hidden="true"
+                            viewBox="0 0 24 24"
+                          >
+                            <circle cx="12" cy="12" r="7" />
+                            <circle cx="12" cy="12" r="2" />
+                          </svg>
+                          <span>
+                            <strong>Otomatik</strong>
+                            <small>Önerilen</small>
+                          </span>
+                        </span>
+                      </label>
+                      <label class="shape-option">
+                        <input type="radio" name="roiShape" value="rectangle" />
+                        <span class="shape-option-content">
+                          <svg
+                            class="shape-option-icon"
+                            aria-hidden="true"
+                            viewBox="0 0 24 24"
+                          >
+                            <rect x="4" y="5" width="16" height="14" rx="2" />
+                          </svg>
+                          <span>
+                            <strong>Dikdörtgen</strong>
+                            <small>İki köşe</small>
+                          </span>
+                        </span>
+                      </label>
+                      <label class="shape-option">
+                        <input type="radio" name="roiShape" value="polygon" />
+                        <span class="shape-option-content">
+                          <svg
+                            class="shape-option-icon"
+                            aria-hidden="true"
+                            viewBox="0 0 24 24"
+                          >
+                            <path d="m4 17 2-10 7-3 7 6-4 9-8 1z" />
+                          </svg>
+                          <span>
+                            <strong>Serbest</strong>
+                            <small>Konturu çiz</small>
+                          </span>
+                        </span>
+                      </label>
+                    </div>
+                    <p id="shape-help" class="quiet"></p>
+                  </fieldset>
+                  <label class="check-row setting-switch"
                     ><input
                       id="show-candidates"
                       type="checkbox"
@@ -388,30 +449,35 @@
                     ></label
                   >
                   <input type="hidden" name="roiPoints" disabled />
-                  <div id="polygon-tools" hidden>
+                  <div id="polygon-tools" class="polygon-tools" hidden>
                     <p id="roi-guidance" class="quiet"></p>
-                    <button id="undo-point" class="secondary" type="button">
-                      Son köşeyi geri al
-                    </button>
-                    <button id="clear-points" class="secondary" type="button">
-                      Alanı temizle
-                    </button>
+                    <div>
+                      <button id="undo-point" class="secondary" type="button">
+                        Son köşeyi geri al
+                      </button>
+                      <button
+                        id="clear-points"
+                        class="secondary"
+                        type="button"
+                      >
+                        Alanı temizle
+                      </button>
+                    </div>
                   </div>
-                  <label class="check-row"
+                  <label class="check-row setting-switch manual-toggle"
                     ><input id="manual" type="checkbox" /><span
-                      >İşaretlenen alanı düzelt<small
-                        >Gerektiğinde hassas alan ayarlarını açar.</small
+                      >Çemberi elle ayarla<small
+                        >Merkez ve yarıçapı görüntü üzerinde düzenleyin.</small
                       ></span
                     ></label
                   >
-                  <p class="quiet">
-                    Uygulama, dış sınırdaki bulanık piksellerin etkisini
-                    azaltmak için ölçümü otomatik olarak biraz içeriden yapar.
-                    Normal kullanımda ek ayar gerekmez.
+                  <p class="quiet settings-note">
+                    Ölçüm, dış sınır etkisini azaltmak için örnek alanın
+                    biraz içinden alınır.
                   </p>
                   <details id="advanced-settings">
                     <summary>
-                      Gelişmiş ayarlar (isteğe bağlı) <span>+</span>
+                      İleri düzey ölçüm ayarları <span>+</span>
                     </summary>
                     <div class="grid-three" id="circle-fields">
                       <label
@@ -662,10 +728,13 @@
                 </table>
               </div>
             </section>
-            <div class="batch-toolbar">
+            <div class="batch-toolbar report-toolbar">
               <label for="report-active-file"
                 >Ayrıntıları göster<select id="report-active-file"></select
               ></label>
+              <button id="export" type="button" class="secondary">
+                ↓ Seçili dosyayı Excel indir
+              </button>
             </div>
             <div id="results">
               <section class="card" style="padding: 20px; margin-bottom: 20px">
@@ -735,9 +804,6 @@
                   <div class="eyebrow">ANALİZ SONUÇLARI</div>
                   <h2>Ölçüm özeti</h2>
                 </div>
-                <button id="export" type="button" class="secondary">
-                  ↓ Excel raporunu indir
-                </button>
               </div>
               <details class="measurement-notes">
                 <summary>

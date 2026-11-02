@@ -85,6 +85,7 @@ function entryStatus(entry) {
 }
 function renderQueue() {
   $('#queue-card').hidden = !entries.length;
+  $('.upload-card').classList.toggle('has-files', !!entries.length);
   $('#queue-count').textContent = `${entries.length} dosya`;
   $('#upload-guidance').textContent = entries.length
     ? 'Dosyalar seçildi. Her dosya için ölçüm ayarlarıyla devam edebilirsiniz.'
@@ -487,36 +488,43 @@ function selectedPoints() {
 function syncShapeControls() {
   const shape = form.elements.roiShape.value;
   const circular = shape === 'circle';
+  if (circular && $('#manual').checked) initializeManualCircle();
   $('#circle-fields').hidden = !circular;
   $('#polygon-tools').hidden = circular;
-  $('#manual').disabled = !circular;
-  if (!circular) $('#manual').checked = true;
-  form.elements.roiPoints.disabled = circular;
+  form.elements.roiPoints.disabled = busy || circular;
   for (const key of ['centerX', 'centerY', 'radius']) {
-    form.elements[key].disabled = !circular || !$('#manual').checked;
+    form.elements[key].disabled =
+      busy || !circular || !$('#manual').checked;
     form.elements[key].required = circular && $('#manual').checked;
   }
+  const hasPoints = selectedPoints().length > 0;
+  $('#undo-point').disabled = busy || circular || !hasPoints;
+  $('#clear-points').disabled = busy || circular || !hasPoints;
+  $('#manual').disabled = busy || !circular;
   $('#canvas-hint').hidden = !circular || !$('#manual').checked;
-  $('#selection-guide').textContent = circular
+  const guidance = circular
     ? $('#manual').checked
-      ? 'Merkezden dışarı sürükleyerek daire çizin.'
-      : 'Basılı tutup sürükleyin; seçtiğiniz alan turuncu olarak görünür.'
+      ? 'Çemberi görüntüde sürükleyerek çizin; merkez ve yarıçapı elle ayarlayabilirsiniz.'
+      : 'Önerilen: ölçümü başlatın, otomatik bulunan sınırı görüntüde doğrulayın. Alanı elle çizmek için Dikdörtgen veya Serbest seçin.'
     : shape === 'rectangle'
-      ? 'Basılı tutup sürükleyerek dikdörtgen çizin veya iki köşeye tıklayın.'
-      : 'Basılı tutup sınırı çizin veya köşelere tıklayın. Seçili alan turuncu görünür.';
+      ? 'Görüntüde basılı tutup sürükleyin veya alanın iki karşı köşesine tıklayın.'
+      : 'Konturu basılı tutup izleyin veya köşelere sırayla tıklayın. Son köşeye yakın çizerek alanı kapatın.';
+  $('#shape-help').textContent = guidance;
+  $('#selection-guide').textContent = guidance;
   $('#roi-guidance').textContent =
     (shape === 'rectangle'
       ? 'Dikdörtgeni sürükleyerek çizin veya iki karşı köşeye tıklayın.'
       : 'Sınırı basılı tutup çizin veya köşelere sırayla tıklayın. Son köşe ilkine otomatik bağlanır.') +
     ` ${selectedPoints().length} köşe seçildi. Yeşil iç sınır hesaplamadan sonra gösterilir.`;
 }
-form.elements.roiShape.addEventListener('change', () => {
-  if (busy) return;
-  form.elements.roiPoints.value = '';
-  syncShapeControls();
-  dirty();
-  drawPreview();
-});
+for (const input of form.querySelectorAll('input[name=roiShape]'))
+  input.addEventListener('change', () => {
+    if (busy) return;
+    form.elements.roiPoints.value = '';
+    syncShapeControls();
+    dirty();
+    drawPreview();
+  });
 for (const [id, clear] of [
   ['undo-point', false],
   ['clear-points', true],
@@ -1001,7 +1009,6 @@ $('#image-canvas').addEventListener('pointermove', (event) => {
     drag.moved = true;
     form.elements.roiShape.value = drag.shape;
     if (drag.shape === 'polygon') form.elements.roiPoints.value = '';
-    if (drag.shape !== 'circle') $('#manual').checked = true;
     form.elements.roiPoints.disabled = drag.shape === 'circle';
     // Keep the layout fixed until release so the canvas stays under the pointer.
     resultDirty = true;
@@ -1153,6 +1160,7 @@ function setBusy(value) {
       input.disabled = true;
     } else input.disabled = input.dataset.wasDisabled === 'true';
   }
+  syncShapeControls();
 }
 async function readError(response) {
   const json = await response.json().catch(() => null);
@@ -1444,7 +1452,7 @@ $('#export').addEventListener('click', async () => {
     showError(error.message);
   } finally {
     setBusy(false);
-    $('#export').textContent = '↓ Excel raporunu indir';
+    $('#export').textContent = '↓ Seçili dosyayı Excel indir';
   }
 });
 

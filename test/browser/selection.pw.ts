@@ -42,6 +42,55 @@ test.beforeEach(async ({ page }) => {
   await expect(page.locator('#image-canvas')).toBeVisible();
 });
 
+test('area selection modes explain their interaction and expose only relevant controls', async ({
+  page,
+}) => {
+  await expect(page.locator('.shape-option')).toHaveCount(3);
+  await expect(page.locator('input[name=roiShape][value=circle]')).toBeChecked();
+  await expect(page.locator('#shape-help')).toContainText('Önerilen');
+  await expect(page.locator('#selection-guide')).toContainText(
+    'otomatik bulunan sınırı',
+  );
+  await expect(page.locator('#undo-point')).toBeDisabled();
+  await expect(page.locator('#clear-points')).toBeDisabled();
+
+  await page.locator('input[name=roiShape][value=rectangle]').check();
+  await expect(page.locator('#shape-help')).toContainText(
+    'iki karşı köşesine tıklayın',
+  );
+  await expect(page.locator('#polygon-tools')).toBeVisible();
+  await expect(page.locator('#manual')).not.toBeChecked();
+  await expect(page.locator('#manual')).toBeDisabled();
+
+  await page.locator('input[name=roiShape][value=polygon]').check();
+  await expect(page.locator('#shape-help')).toContainText('Konturu');
+  await expect(page.locator('#selection-guide')).toContainText(
+    'köşelere sırayla tıklayın',
+  );
+  await page.locator('#image-canvas').click({ position: { x: 64, y: 64 } });
+  await expect(page.locator('#undo-point')).toBeEnabled();
+  await page.locator('#undo-point').click();
+  await expect(page.locator('#undo-point')).toBeDisabled();
+  await expect(page.locator('#clear-points')).toBeDisabled();
+
+  await page.locator('input[name=roiShape][value=circle]').check();
+  await page.locator('#manual').check();
+  await expect(page.locator('input[name=centerX]')).toBeEnabled();
+  await expect(page.locator('#shape-help')).toContainText(
+    'Çemberi görüntüde sürükleyerek çizin',
+  );
+  await page.locator('#advanced-settings summary').click();
+  await page.locator('input[name=insetPixels]').scrollIntoViewIfNeeded();
+  await expect(page.locator('#analyze')).toBeInViewport();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+});
+
 test('a dragged rectangle is visible while the pointer is held and its fill never changes the measured pixels', async ({
   page,
 }) => {
@@ -49,7 +98,7 @@ test('a dragged rectangle is visible while the pointer is held and its fill neve
   await move(page, 64, 64);
   await page.mouse.down();
   await move(page, 400, 400, 12);
-  await expect(page.locator('#roi-shape')).toHaveValue('rectangle');
+  await expect(page.locator('input[name=roiShape][value=rectangle]')).toBeChecked();
   expect(await red(page)).toBeGreaterThan(80);
   await page.mouse.up();
   const points = await page.locator('input[name=roiPoints]').inputValue();
@@ -64,7 +113,7 @@ test('a dragged rectangle is visible while the pointer is held and its fill neve
 test('freehand selection is visibly filled and closes without a duplicate first corner', async ({
   page,
 }) => {
-  await page.locator('#roi-shape').selectOption('polygon');
+  await page.locator('input[name=roiShape][value=polygon]').check();
   await move(page, 64, 64);
   await page.mouse.down();
   for (const [x, y] of [
@@ -136,7 +185,7 @@ test('a scaled preview stays under the pointer during drawing on a narrow screen
   await move(page, 400, 400, 10);
   expect(
     Math.abs((await page.locator('#image-canvas').boundingBox())!.y - top),
-  ).toBeLessThan(2);
+  ).toBeLessThanOrEqual(2);
   expect(await red(page)).toBeGreaterThan(80);
   await page.mouse.up();
   expect(

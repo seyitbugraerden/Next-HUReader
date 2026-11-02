@@ -177,6 +177,7 @@ test('uploaded images show previews and can be removed from their preview card',
   page,
 }) => {
   await page.goto('/');
+  await page.setViewportSize({ width: 1440, height: 844 });
   await page.locator('#file').setInputFiles([
     { name: 'first-slice.png', mimeType: 'image/png', buffer: await disk(80) },
     { name: 'second-slice.png', mimeType: 'image/png', buffer: await disk(180) },
@@ -187,6 +188,22 @@ test('uploaded images show previews and can be removed from their preview card',
   await expect(cards).toHaveCount(2);
   await expect(page.locator('#queue-card')).toBeVisible();
   await expect(page.locator('.upload-card #queue-card')).toBeVisible();
+  await expect(page.locator('.upload-card #go-analyze')).toBeVisible();
+  await expect
+    .poll(() =>
+      page.locator('.upload-card .dropzone').evaluate(
+        (dropzone) => dropzone.getBoundingClientRect().height,
+      ),
+    )
+    .toBeLessThan(180);
+  await expect
+    .poll(() =>
+      page.locator('#go-analyze').evaluate(
+        (button) =>
+          button.getBoundingClientRect().bottom <= window.innerHeight,
+      ),
+    )
+    .toBe(true);
   await expect(cards.nth(0).locator('.queue-name')).toHaveText(
     'first-slice.png',
   );
@@ -306,6 +323,8 @@ test('per-file geometry, calibration, stale results and both Excel reports remai
   ).toBe('Hata');
   await expect(page.locator('#export')).toBeEnabled();
   const singleDownload = page.waitForEvent('download');
+  await expect(page.locator('#export')).toBeVisible();
+  await expect(page.locator('#export')).toHaveText('↓ Seçili dosyayı Excel indir');
   await page.locator('#export').click();
   const singlePath = info.outputPath('single.xlsx');
   await (await singleDownload).saveAs(singlePath);
@@ -497,7 +516,7 @@ test('flat and irregular samples use rectangle and polygon areas in the UI and E
     );
     await page.mouse.click(Math.round(point.x), Math.round(point.y));
   };
-  await page.locator('#roi-shape').selectOption('rectangle');
+  await page.locator('input[name=roiShape][value=rectangle]').check();
   await page.locator('#advanced-settings summary').click();
   await page.locator('input[name=insetPixels]').fill('1');
   await clickPixel(2, 2);
@@ -506,7 +525,7 @@ test('flat and irregular samples use rectangle and polygon areas in the UI and E
   await expect(page.locator('#error')).toBeHidden();
   await expect(page.locator('#metric-count')).toHaveText('9');
   await expect(page.locator('#interpretation')).toContainText('standart sapma');
-  await page.locator('#roi-shape').selectOption('polygon');
+  await page.locator('input[name=roiShape][value=polygon]').check();
   for (const [x, y] of [
     [1, 1],
     [6, 1],
@@ -725,7 +744,7 @@ test('uncertain images request a visual boundary and recover without technical i
   );
   await expect(page.locator('#batch-counts')).not.toContainText('1 hata');
   await page.locator('#draw-area').click();
-  await expect(page.locator('#roi-shape')).toHaveValue('polygon');
+  await expect(page.locator('input[name=roiShape][value=polygon]')).toBeChecked();
   await expect(page.locator('#advanced-settings')).not.toHaveAttribute('open');
   for (const [x, y] of [
     [10, 10],
