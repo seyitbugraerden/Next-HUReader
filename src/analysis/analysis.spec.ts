@@ -104,9 +104,16 @@ describe('Numerical analysis', () => {
       const image = await sharp(pixels, { raw: { width, height, channels: 1 } })
         .png()
         .toBuffer();
-      await expect(service.analyze(image, `${kind}.png`, {})).rejects.toThrow(
-        'Dairesel numune',
-      );
+      if (kind === 'uniform') {
+        await expect(service.analyze(image, `${kind}.png`, {})).rejects.toThrow(
+          'Dairesel numune',
+        );
+      } else {
+        const result = await service.analyze(image, `${kind}.png`, {});
+        expect(result.roi.shape).toBe('polygon');
+        expect(result.roi.outlines).toHaveLength(1);
+        expect(result.measurements[0].mean).toBe(180);
+      }
       // Manual ROI remains possible on a deliberately selected region.
       const manualResult = await service.analyze(image, `${kind}.png`, {
         centerX: 100,

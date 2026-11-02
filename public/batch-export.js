@@ -74,11 +74,13 @@ async function createBatchWorkbook(entries) {
       entry.relativePath || entry.file.name,
       ready
         ? 'Hesaplandı'
-        : entry.error
-          ? 'Hata'
-          : entry.result
-            ? 'Yeniden hesaplanmalı'
-            : 'Bekliyor',
+        : entry.needsArea
+          ? 'Alan seçimi bekliyor'
+          : entry.error
+            ? 'Hata'
+            : entry.result
+              ? 'Yeniden hesaplanmalı'
+              : 'Bekliyor',
       entry.error ||
         (ready
           ? 'Ölçüm alanı kullanıcı tarafından kontrol edilmelidir.'

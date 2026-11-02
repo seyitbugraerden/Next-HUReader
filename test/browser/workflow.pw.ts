@@ -461,3 +461,91 @@ test('automatic flat-piece fallback returns results and exports each piece witho
   expect(sheet.getCell(6, 7).value).toBe(160);
   expect(book.getWorksheet('Ölçüm Alanı')!.getImages()).toHaveLength(1);
 });
+
+test('different shapes share automatic batch analysis while retaining their own results and Excel outlines', async ({
+  page,
+}, info) => {
+  const { default: sharp } = await import('sharp');
+  const pixels = Buffer.alloc(128 * 128);
+  for (let y = 20; y < 90; y++)
+    for (let x = 20; x < 90; x++)
+      if (x < 40 || y < 40) pixels[y * 128 + x] = 180;
+  const buffer = await sharp(pixels, {
+    raw: { width: 128, height: 128, channels: 1 },
+  })
+    .png()
+    .toBuffer();
+  await page.goto('/');
+  await page.locator('#file').setInputFiles([
+    { name: 'irregular.png', mimeType: 'image/png', buffer },
+    { name: 'round.png', mimeType: 'image/png', buffer: await disk(80) },
+  ]);
+  await page.locator('#go-analyze').click();
+  await page.locator('#analyze-all').click();
+  await expect(page.locator('#batch-counts')).toContainText('2/2 hesaplandı');
+  await expect(page.locator('#advanced-settings')).not.toHaveAttribute('open');
+  await page.locator('#go-report').click();
+  await expect(page.locator('#metric-mean')).toHaveText('180,0');
+  const options = await page
+    .locator('#report-active-file option')
+    .evaluateAll((nodes) =>
+      nodes.map((n) => ({ value: n.value, text: n.textContent! })),
+    );
+  await page
+    .locator('#report-active-file')
+    .selectOption(options.find((o) => o.text.includes('round.png'))!.value);
+  await expect(page.locator('#metric-mean')).toHaveText('80,0');
+  await expect(page.locator('#part-results')).toBeHidden();
+  await page
+    .locator('#report-active-file')
+    .selectOption(options.find((o) => o.text.includes('irregular.png'))!.value);
+  await expect(page.locator('#metric-mean')).toHaveText('180,0');
+  await expect(page.locator('#part-measurements tr')).toHaveCount(1);
+  const download = page.waitForEvent('download');
+  await page.locator('#export-batch').click();
+  const path = info.outputPath('mixed-shapes.xlsx');
+  await (await download).saveAs(path);
+  const book = new ExcelJS.Workbook();
+  await book.xlsx.readFile(path);
+  expect(book.getWorksheet('CT Sayıları')!.rowCount).toBe(8);
+  expect(book.getWorksheet('Ölçüm Alanı')!.getCell(2, 9).value).toBe('polygon');
+  expect(book.getWorksheet('Ölçüm Alanı')!.getCell(3, 9).value).toBe('circle');
+  expect(book.getWorksheet('Ölçüm Alanı')!.getImages()).toHaveLength(2);
+});
+
+test('uncertain images request a visual boundary and recover without technical inputs', async ({
+  page,
+}) => {
+  const { default: sharp } = await import('sharp');
+  const buffer = await sharp(Buffer.alloc(128 * 128, 80), {
+    raw: { width: 128, height: 128, channels: 1 },
+  })
+    .png()
+    .toBuffer();
+  await page.goto('/');
+  await page
+    .locator('#file')
+    .setInputFiles({ name: 'uncertain.png', mimeType: 'image/png', buffer });
+  await page.locator('#go-analyze').click();
+  await page.locator('#analyze').click();
+  await expect(page.locator('#draw-area')).toBeVisible();
+  await expect(page.locator('#batch-counts')).toContainText(
+    '1 alan seçimi bekliyor',
+  );
+  await expect(page.locator('#batch-counts')).not.toContainText('1 hata');
+  await page.locator('#draw-area').click();
+  await expect(page.locator('#roi-shape')).toHaveValue('polygon');
+  await expect(page.locator('#advanced-settings')).not.toHaveAttribute('open');
+  for (const [x, y] of [
+    [10, 10],
+    [110, 10],
+    [110, 110],
+    [10, 110],
+  ])
+    await page.locator('#image-canvas').click({ position: { x: x!, y: y! } });
+  await page.locator('#analyze').click();
+  await expect(page.locator('#go-report')).toBeEnabled();
+  await expect(page.locator('#batch-counts')).toHaveText('1/1 hesaplandı');
+  await page.locator('#go-report').click();
+  await expect(page.locator('#metric-mean')).toHaveText('80,0');
+});

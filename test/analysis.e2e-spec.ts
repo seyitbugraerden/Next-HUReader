@@ -236,6 +236,62 @@ describe('Analysis HTTP API', () => {
       .attach('file', image, 'flat.png')
       .expect(201);
   });
+  it.each(['concave', 'rotated', 'light-background', 'multiple-round'])(
+    'uses the same automatic pipeline for a %s sample',
+    async (kind) => {
+      const data = Buffer.alloc(
+        128 * 128,
+        kind === 'light-background' ? 240 : 0,
+      );
+      for (let y = 0; y < 128; y++)
+        for (let x = 0; x < 128; x++) {
+          const u = (x - 64) * Math.cos(0.7) + (y - 64) * Math.sin(0.7),
+            v = -(x - 64) * Math.sin(0.7) + (y - 64) * Math.cos(0.7);
+          const included =
+            kind === 'multiple-round'
+              ? Math.hypot(x - 38, y - 64) < 16 ||
+                Math.hypot(x - 90, y - 64) < 16
+              : kind === 'rotated'
+                ? Math.abs(u) < 35 && Math.abs(v) < 14
+                : x >= 20 && x < 90 && y >= 20 && y < 90 && (x < 40 || y < 40);
+          if (included)
+            data[y * 128 + x] = kind === 'light-background' ? 60 : 180;
+        }
+      const image = await sharp(data, {
+        raw: { width: 128, height: 128, channels: 1 },
+      })
+        .png()
+        .toBuffer();
+      const response = await request(app.getHttpServer())
+        .post('/api/analyze')
+        .attach('file', image, 'sample.png')
+        .expect(201);
+      expect(response.body.roi).toMatchObject({
+        automatic: true,
+        shape: 'polygon',
+      });
+      expect(response.body.parts).toHaveLength(
+        kind === 'multiple-round' ? 2 : 1,
+      );
+      expect(response.body.measurements[0].count).toBeGreaterThan(100);
+      expect(response.body.measurements[0].mean).toBeCloseTo(
+        kind === 'light-background' ? 60 : 180,
+      );
+      if (kind === 'concave' || kind === 'light-background') {
+        const decoded = await sharp(
+          Buffer.from(response.body.roi.labelMask.split(',')[1], 'base64'),
+        )
+          .raw()
+          .toBuffer({ resolveWithObject: true });
+        expect(decoded.data[(80 * 128 + 80) * decoded.info.channels]).toBe(0);
+        expect(decoded.data[(25 * 128 + 25) * decoded.info.channels]).toBe(1);
+      }
+      await request(app.getHttpServer())
+        .post('/api/export')
+        .attach('file', image, 'sample.png')
+        .expect(201);
+    },
+  );
   it('downloads a real Excel archive', async () => {
     const res = await upload('/api/export')
       .attach('file', dicomFixture(), { filename: 'Z01.dcm' })

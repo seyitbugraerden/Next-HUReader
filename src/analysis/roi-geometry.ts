@@ -86,5 +86,5 @@ export function polygonMembership(
   const full =
     inside ||
     points.some((a, i) => onSegment(a, points[(i + 1) % points.length]!, p));
-  return { full, inner: full && distance + 1e-9 >= inset };
+  return { full, inner: full && distance + 1e-9 >= inset, distance };
 }

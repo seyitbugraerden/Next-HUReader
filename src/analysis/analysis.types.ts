@@ -51,6 +51,13 @@ export interface AnalysisResult {
     shape?: 'circle' | 'rectangle' | 'polygon';
     points?: [number, number][];
     outlines?: [number, number][][];
+    labelMask?: string;
+    detection?: {
+      method: 'foreground';
+      threshold: number;
+      background: 'light' | 'dark';
+      croppedParts: number;
+    };
     innerBoundary?: [number, number][];
     insetPixels: number;
     innerRadius: number;

@@ -5,7 +5,10 @@ import { decodeImage } from './image-decoder.js';
 import { detectCircle, statistics } from './statistics.js';
 import { polygonMembership, validatePolygon } from './roi-geometry.js';
 import { findDefectCandidates } from './defect-candidates.js';
-import { detectFlatPieces } from './flat-sample.js';
+import {
+  detectSampleAreas,
+  type SampleSegmentation,
+} from './sample-segmentation.js';
 import type {
   AnalysisOptions,
   AnalysisResult,
@@ -141,6 +144,7 @@ export class AnalysisService {
     const { width, height, values, valid } = image;
     let shape = options.roiShape ?? 'circle';
     let outlines: [number, number][][] | undefined;
+    let segmentation: SampleSegmentation | undefined;
     let points = options.roiPoints;
     if (shape !== 'circle') {
       if (
@@ -193,11 +197,14 @@ export class AnalysisService {
           'Otomatik çember bir öneridir. Ölçüm alanını görüntü üzerinde kontrol edin; gerekiyorsa düzeltin.',
         );
       } else {
-        outlines = detectFlatPieces(image) ?? undefined;
+        segmentation = detectSampleAreas(image) ?? undefined;
+        outlines = segmentation?.outlines;
         if (!outlines)
-          throw new BadRequestException(
-            'Dairesel numune veya yassı numune sınırı güvenilir biçimde bulunamadı. Numunenin şeklini dikdörtgen ya da düzensiz olarak seçip görüntü üzerinde alanı işaretleyin.',
-          );
+          throw new BadRequestException({
+            message:
+              'Dairesel numune veya başka güvenilir bir numune alanı bulunamadı. Görüntü üzerinde numune sınırını işaretleyin.',
+            code: 'ROI_REQUIRED',
+          });
         const vertices = outlines.flat();
         circle = {
           x:
@@ -212,8 +219,12 @@ export class AnalysisService {
         };
         shape = 'polygon';
         image.warnings.push(
-          `Otomatik olarak ${outlines.length} yassı parça için alan önerildi. Sonuçlar bu parçaların birleşik alanına aittir; ayrı numuneler varsa alanı tek numuneye göre düzeltin. Aralardaki boşluklar ölçüme dahil değildir. Sınırları görüntü üzerinde kontrol edin.`,
+          `Otomatik olarak ${outlines.length} numune parçası için alan önerildi. Sonuçlar bu parçaların birleşik alanına aittir; ayrı numuneler varsa alanı tek numuneye göre düzeltin. Aralardaki boşluklar ölçüme dahil değildir. Sınırları görüntü üzerinde kontrol edin.`,
         );
+        if (segmentation?.croppedParts)
+          image.warnings.push(
+            `${segmentation.croppedParts} parça görüntü kenarına ulaşıyor; yalnızca görünen alan ölçüldü, numunenin tamamı olduğu varsayılmadı.`,
+          );
       }
     }
     const { x: cx, y: cy, radius: r } = circle;
@@ -228,18 +239,19 @@ export class AnalysisService {
     let inset =
       options.insetPixels ??
       (image.spacing ? 2.1 / Math.min(...image.spacing) : 10);
-    if (outlines && options.insetPixels === undefined) {
-      const shortest = Math.min(
-        ...outlines.map((polygon) =>
-          Math.min(
-            Math.max(...polygon.map((p) => p[0])) -
-              Math.min(...polygon.map((p) => p[0])),
-            Math.max(...polygon.map((p) => p[1])) -
-              Math.min(...polygon.map((p) => p[1])),
-          ),
-        ),
-      );
-      inset = Math.min(inset, shortest * 0.2);
+    if (outlines && segmentation && options.insetPixels === undefined) {
+      const clearance = outlines.map(() => 0);
+      // Estimate usable thickness from the actual silhouette, not its box.
+      for (let y = 0; y < height; y += 2)
+        for (let x = 0; x < width; x += 2) {
+          const part = segmentation.labels[y * width + x]! - 1;
+          if (part < 0) continue;
+          const member = polygonMembership(outlines[part]!, x, y, 0);
+          if (member.full)
+            clearance[part] = Math.max(clearance[part]!, member.distance);
+        }
+      const safe = Math.min(...clearance) * 0.4;
+      if (safe > 0) inset = Math.min(inset, safe);
     }
     if (shape === 'circle' && inset >= r)
       throw new BadRequestException('Kenar payı yarıçaptan küçük olmalıdır.');
@@ -257,26 +269,26 @@ export class AnalysisService {
         const v = values[i]!;
         all.push(v);
         const d2 = (x - cx) ** 2 + (y - cy) ** 2;
+        const detectedPart = segmentation?.labels[i] ?? 0;
         const selected =
           shape === 'circle'
             ? { full: d2 <= r * r, inner: d2 <= inner * inner }
-            : outlines
-              ? outlines.reduce(
-                  (combined, polygon) => {
-                    const selected = polygonMembership(polygon, x, y, inset);
-                    return {
-                      full: combined.full || selected.full,
-                      inner: combined.inner || selected.inner,
-                    };
-                  },
-                  { full: false, inner: false },
-                )
+            : segmentation
+              ? {
+                  full: detectedPart > 0,
+                  inner:
+                    detectedPart > 0 &&
+                    polygonMembership(outlines![detectedPart - 1]!, x, y, inset)
+                      .inner,
+                }
               : polygonMembership(points!, x, y, inset);
         if (selected.full) full.push(v);
         if (selected.inner && outlines) {
-          const partIndex = outlines.findIndex(
-            (polygon) => polygonMembership(polygon, x, y, inset).inner,
-          );
+          const partIndex = segmentation
+            ? detectedPart - 1
+            : outlines.findIndex(
+                (polygon) => polygonMembership(polygon, x, y, inset).inner,
+              );
           if (partIndex >= 0) partValues[partIndex]!.push(v);
         }
         if (selected.inner) {
@@ -290,6 +302,12 @@ export class AnalysisService {
             regionValues[5]!.push(v);
         }
       }
+    if (!sample.length && outlines)
+      throw new BadRequestException({
+        message:
+          'Bu görüntüde ölçülebilecek güvenilir bir numune iç alanı bulunamadı. Önizleme üzerinde numune sınırını çizerek tekrar deneyin.',
+        code: 'ROI_REQUIRED',
+      });
     const pixelArea = image.spacing
       ? image.spacing[0] * image.spacing[1]
       : null;
@@ -398,7 +416,7 @@ export class AnalysisService {
     ];
     if (outlines)
       interpretation.unshift(
-        `${outlines.length} yassı parça için otomatik alan önerildi. Genel ölçüm bütün işaretli parçaların birleşik alanına aittir; her parçanın değerleri ayrıca listelenir. Parçaların sınırlarını kontrol edin.`,
+        `${outlines.length} numune parçası için otomatik alan önerildi. Genel ölçüm bütün işaretli parçaların birleşik alanına aittir; her parçanın değerleri ayrıca listelenir. Parçaların sınırlarını kontrol edin.`,
       );
     for (const [a, b, label] of [
       [0, 1, 'Üst ve alt'],
@@ -481,6 +499,15 @@ export class AnalysisService {
           'Mermer Excel referansı gerçek HU değerlerine aittir; gri ton ve yaklaşık HU sonuçlarıyla doğrudan karşılaştırılmadı.',
         );
     }
+    const labelMask = segmentation
+      ? `data:image/png;base64,${(
+          await sharp(Buffer.from(Uint8Array.from(segmentation.labels)), {
+            raw: { width, height, channels: 1 },
+          })
+            .png()
+            .toBuffer()
+        ).toString('base64')}`
+      : undefined;
     return {
       filename,
       width,
@@ -492,6 +519,17 @@ export class AnalysisService {
       roi: {
         ...circle,
         shape,
+        ...(labelMask ? { labelMask } : {}),
+        ...(segmentation
+          ? {
+              detection: {
+                method: 'foreground' as const,
+                threshold: segmentation.threshold,
+                background: segmentation.background,
+                croppedParts: segmentation.croppedParts,
+              },
+            }
+          : {}),
         ...(shape !== 'circle'
           ? { ...(outlines ? { outlines } : { points }), innerBoundary }
           : {}),
@@ -649,6 +687,7 @@ export class AnalysisService {
     for (const [key, value] of Object.entries(result.roi)) {
       if (
         key === 'innerBoundary' ||
+        key === 'labelMask' ||
         ((result.roi.points || result.roi.outlines) &&
           ['radius', 'innerRadius'].includes(key))
       )

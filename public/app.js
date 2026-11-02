@@ -71,13 +71,15 @@ function applySettings(settings) {
 function entryStatus(entry) {
   return entry.processing
     ? 'İşleniyor'
-    : entry.error
-      ? 'Hata'
-      : entry.result && !entry.dirty
-        ? 'Hesaplandı'
-        : entry.result
-          ? 'Yeniden hesaplanmalı'
-          : 'Bekliyor';
+    : entry.needsArea
+      ? 'Alan seçimi bekliyor'
+      : entry.error
+        ? 'Hata'
+        : entry.result && !entry.dirty
+          ? 'Hesaplandı'
+          : entry.result
+            ? 'Yeniden hesaplanmalı'
+            : 'Bekliyor';
 }
 function renderQueue() {
   $('#queue-card').hidden = !entries.length;
@@ -100,7 +102,7 @@ function renderQueue() {
       name.className = 'queue-name';
       name.textContent = entryLabel(entry);
       const status = document.createElement('span');
-      status.className = `queue-state ${entry.error ? 'has-error' : entry.result && !entry.dirty ? 'is-ready' : ''}`;
+      status.className = `queue-state ${entry.error && !entry.needsArea ? 'has-error' : entry.result && !entry.dirty ? 'is-ready' : ''}`;
       status.textContent = entryStatus(entry);
       status.title = entry.error || '';
       const remove = document.createElement('button');
@@ -134,9 +136,10 @@ function renderQueue() {
     select.disabled = busy || !list.length;
   }
   const ready = readyEntries().length,
-    errors = entries.filter((e) => e.error).length;
+    errors = entries.filter((e) => e.error && !e.needsArea).length,
+    review = entries.filter((e) => e.needsArea).length;
   $('#batch-counts').textContent =
-    `${ready}/${entries.length} hesaplandı${errors ? ` · ${errors} hata` : ''}`;
+    `${ready}/${entries.length} hesaplandı${errors ? ` · ${errors} hata` : ''}${review ? ` · ${review} alan seçimi bekliyor` : ''}`;
   $('#batch-report-note').textContent =
     `${ready} dosyanın güncel ölçümleri rapora dahil edilir. ${entries.length - ready} dosya hatalı, bekliyor veya yeniden hesaplanmalı. Her ölçüm alanını ilgili dosyada kontrol edin.`;
   const compared = readyEntries().map((entry) => entry.result);
@@ -272,6 +275,8 @@ function showError(message) {
 }
 function syncWorkflow() {
   saveCurrent();
+  $('#draw-area').hidden = currentStep !== 2 || !activeEntry()?.needsArea;
+  $('#draw-area').disabled = busy || importing;
   const hasReady = readyEntries().length > 0;
   ['upload', 'analyze', 'report'].forEach((name, index) => {
     const step = index + 1;
@@ -358,7 +363,10 @@ for (const button of document.querySelectorAll('[data-step]'))
 function dirty() {
   resultDirty = true;
   $('#batch-progress').hidden = true;
-  if (activeEntry()) activeEntry().error = null;
+  if (activeEntry()) {
+    activeEntry().error = null;
+    activeEntry().needsArea = false;
+  }
   syncWorkflow();
   if (result) {
     $('#status').textContent =
@@ -393,6 +401,17 @@ function toggleManual() {
   drawPreview();
 }
 $('#manual').addEventListener('change', toggleManual);
+$('#draw-area').addEventListener('click', () => {
+  if (busy || !file) return;
+  form.elements.roiShape.value = 'polygon';
+  form.elements.roiPoints.value = '';
+  syncShapeControls();
+  dirty();
+  $('#error').hidden = true;
+  drawPreview();
+  $('#preview-panel').scrollIntoView({ block: 'center' });
+});
+
 $('#show-candidates').addEventListener('change', drawPreview);
 function selectedPoints() {
   try {
@@ -642,7 +661,7 @@ async function loadDicomPreview(entry) {
     const body = new FormData();
     body.set('file', entry.file);
     const response = await fetch('/api/preview', { method: 'POST', body });
-    if (!response.ok) throw new Error(await readError(response));
+    if (!response.ok) throw await readError(response);
     const preview = await response.json();
     entry.preview = preview;
     if (activeId !== entry.id || previewRevision !== revision) return;
@@ -811,9 +830,13 @@ function setBusy(value) {
 }
 async function readError(response) {
   const json = await response.json().catch(() => null);
-  return typeof json?.message === 'string'
-    ? json.message
-    : 'İşlem tamamlanamadı. Dosyayı ve ölçüm ayarlarını kontrol edin.';
+  const error = new Error(
+    typeof json?.message === 'string'
+      ? json.message
+      : 'İşlem tamamlanamadı. Dosyayı ve ölçüm ayarlarını kontrol edin.',
+  );
+  error.code = json?.code;
+  return error;
 }
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -835,6 +858,7 @@ form.addEventListener('submit', async (event) => {
   }
   resultDirty = true;
   activeEntry().error = null;
+  activeEntry().needsArea = false;
   activeEntry().processing = true;
   setBusy(true);
   $('#error').hidden = true;
@@ -843,7 +867,7 @@ form.addEventListener('submit', async (event) => {
     'Görüntü okunuyor, ölçüm alanı ve dağılım hesaplanıyor…';
   try {
     const response = await fetch('/api/analyze', { method: 'POST', body });
-    if (!response.ok) throw new Error(await readError(response));
+    if (!response.ok) throw await readError(response);
     result = await response.json();
     analyzedBody = body;
     resultDirty = false;
@@ -852,6 +876,7 @@ form.addEventListener('submit', async (event) => {
     $('#status').hidden = true;
   } catch (error) {
     activeEntry().error = error.message;
+    activeEntry().needsArea = error.code === 'ROI_REQUIRED';
     showError(error.message);
     $('#status').hidden = true;
     if (result) {
@@ -1082,7 +1107,7 @@ $('#export').addEventListener('click', async () => {
       method: 'POST',
       body: analyzedBody,
     });
-    if (!response.ok) throw new Error(await readError(response));
+    if (!response.ok) throw await readError(response);
     const url = URL.createObjectURL(await response.blob());
     const a = document.createElement('a');
     a.href = url;
@@ -1209,13 +1234,14 @@ $('#analyze-all').addEventListener('click', async () => {
     for (const [index, entry] of pending.entries()) {
       entry.processing = true;
       entry.error = null;
+      entry.needsArea = false;
       $('#batch-progress').textContent =
         `${index + 1}/${pending.length} işleniyor · ${entryLabel(entry)}`;
       renderQueue();
       try {
         const body = bodyForEntry(entry);
         const response = await fetch('/api/analyze', { method: 'POST', body });
-        if (!response.ok) throw new Error(await readError(response));
+        if (!response.ok) throw await readError(response);
         entry.result = await response.json();
         entry.body = body;
         entry.dirty = false;
@@ -1227,6 +1253,7 @@ $('#analyze-all').addEventListener('click', async () => {
           entry.settings.values[key] = value.toFixed(3);
       } catch (error) {
         entry.error = error.message;
+        entry.needsArea = error.code === 'ROI_REQUIRED';
         entry.dirty = true;
       }
       entry.processing = false;
@@ -1236,7 +1263,7 @@ $('#analyze-all').addEventListener('click', async () => {
     selectEntry(selected, false);
     setBusy(false);
     $('#batch-progress').textContent =
-      `İşlem tamamlandı: ${readyEntries().length}/${entries.length} hesaplandı · ${entries.filter((e) => e.error).length} hata. Dosyalar arasında geçerek ölçüm alanlarını kontrol edin.`;
+      `İşlem tamamlandı: ${readyEntries().length}/${entries.length} hesaplandı · ${entries.filter((e) => e.error && !e.needsArea).length} hata · ${entries.filter((e) => e.needsArea).length} alan seçimi bekliyor. Dosyalar arasında geçerek ölçüm alanlarını kontrol edin.`;
   }
 });
 $('#export-batch').addEventListener('click', async () => {
