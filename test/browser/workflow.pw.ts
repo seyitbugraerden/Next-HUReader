@@ -289,6 +289,7 @@ test('flat and irregular samples use rectangle and polygon areas in the UI and E
     canvas.style.height = '256px';
   });
   const clickPixel = async (x: number, y: number) => {
+    await page.locator('#image-canvas').scrollIntoViewIfNeeded();
     const point = await page.locator('#image-canvas').evaluate(
       (canvas: HTMLCanvasElement, p) => {
         const rect = canvas.getBoundingClientRect();
@@ -306,6 +307,7 @@ test('flat and irregular samples use rectangle and polygon areas in the UI and E
     await page.mouse.click(Math.round(point.x), Math.round(point.y));
   };
   await page.locator('#roi-shape').selectOption('rectangle');
+  await page.locator('#advanced-settings summary').click();
   await page.locator('input[name=insetPixels]').fill('1');
   await clickPixel(2, 2);
   await clickPixel(6, 6);
@@ -379,4 +381,83 @@ test('candidate overlays can be inspected without invalidating the measurement',
   await expect.poll(redAtLine).toBeGreaterThan(0);
   await page.locator('#go-report').click();
   await expect(page.locator('#export')).toBeEnabled();
+});
+
+test('default analysis needs no material reference or technical settings', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.locator('#file').setInputFiles({
+    name: 'sample.png',
+    mimeType: 'image/png',
+    buffer: await disk(80),
+  });
+  await page.locator('#go-analyze').click();
+  await expect(page.locator('#material-reference')).toHaveCount(0);
+  await expect(page.locator('#advanced-settings')).not.toHaveAttribute('open');
+  await expect(page.locator('input[name=insetPixels]')).toBeHidden();
+  await expect(page.locator('input[name=lowDensityThreshold]')).toBeHidden();
+  const sent = page.waitForRequest((r) => r.url().endsWith('/api/analyze'));
+  await page.locator('#analyze').click();
+  const payload = (await sent).postData() || '';
+  expect(payload).not.toContain('name="materialReference"');
+  expect(payload).not.toContain('name="insetPixels"');
+  expect(payload).not.toContain('name="lowDensityThreshold"');
+  await expect(page.locator('#error')).toBeHidden();
+  await expect(page.locator('#go-report')).toBeEnabled();
+  await expect(page.locator('#advanced-settings')).not.toHaveAttribute('open');
+  await page.locator('#go-report').click();
+  await expect(page.locator('#metric-mean')).toHaveText('80,0');
+  await expect(page.locator('#detection-method')).not.toHaveAttribute('open');
+  await expect(page.locator('#interpretation')).not.toContainText(
+    'medyan ve mutlak sapmasından',
+  );
+});
+
+test('automatic flat-piece fallback returns results and exports each piece without manual settings', async ({
+  page,
+}, info) => {
+  const { default: sharp } = await import('sharp');
+  const pixels = Buffer.alloc(128 * 128);
+  for (const [top, value] of [
+    [10, 80],
+    [70, 160],
+  ])
+    for (let y = top!; y < top! + 40; y++)
+      for (let x = 40; x < 60; x++) pixels[y * 128 + x] = value!;
+  const buffer = await sharp(pixels, {
+    raw: { width: 128, height: 128, channels: 1 },
+  })
+    .png()
+    .toBuffer();
+  await page.goto('/');
+  await page
+    .locator('#file')
+    .setInputFiles({ name: 'flat.png', mimeType: 'image/png', buffer });
+  await page.locator('#go-analyze').click();
+  await page.locator('#analyze').click();
+  await expect(page.locator('#error')).toBeHidden();
+  await expect(page.locator('#go-report')).toBeEnabled();
+  await expect(page.locator('#advanced-settings')).not.toHaveAttribute('open');
+  await page.locator('#go-report').click();
+  await expect(page.locator('#metric-mean')).toHaveText('120,0');
+  await expect(page.locator('#part-measurements tr')).toHaveCount(2);
+  await expect(page.locator('#part-measurements tr').nth(0)).toContainText(
+    '80,0',
+  );
+  await expect(page.locator('#part-measurements tr').nth(1)).toContainText(
+    '160,0',
+  );
+  await expect(page.locator('#interpretation')).toContainText('birleşik alan');
+  const download = page.waitForEvent('download');
+  await page.locator('#export-batch').click();
+  const path = info.outputPath('flat-pieces.xlsx');
+  await (await download).saveAs(path);
+  const book = new ExcelJS.Workbook();
+  await book.xlsx.readFile(path);
+  const sheet = book.getWorksheet('CT Sayıları')!;
+  expect(sheet.rowCount).toBe(6);
+  expect(sheet.getCell(5, 4).value).toBe('Otomatik parça 1');
+  expect(sheet.getCell(6, 7).value).toBe(160);
+  expect(book.getWorksheet('Ölçüm Alanı')!.getImages()).toHaveLength(1);
 });

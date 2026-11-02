@@ -104,6 +104,23 @@ async function createBatchWorkbook(entries) {
         m.p95,
       ]),
     );
+    for (const part of r.parts || []) {
+      const m = part.measurements;
+      sheets.measurements.addRow([
+        ...identity,
+        units,
+        `Otomatik parça ${part.index}`,
+        m?.count ?? 0,
+        m?.area ?? null,
+        m?.mean ?? null,
+        m?.std ?? null,
+        m?.median ?? null,
+        m?.min ?? null,
+        m?.max ?? null,
+        m?.p5 ?? null,
+        m?.p95 ?? null,
+      ]);
+    }
     r.regions.forEach((region) =>
       sheets.regions.addRow([
         ...identity,
@@ -117,6 +134,7 @@ async function createBatchWorkbook(entries) {
       ...r.metadata,
       Matris: `${r.width} × ${r.height}`,
       'Sayısal değerlendirme': (r.interpretation || []).join(' '),
+      'Teknik açıklama': (r.technicalNotes || []).join(' '),
       ...(r.defects
         ? {
             'Düşük yoğunluk adayı sayısı': r.defects.count,
@@ -152,12 +170,14 @@ async function createBatchWorkbook(entries) {
       ...identity,
       r.roi.x,
       r.roi.y,
-      r.roi.points ? null : r.roi.radius,
+      r.roi.points || r.roi.outlines ? null : r.roi.radius,
       r.roi.insetPixels,
-      r.roi.points ? null : r.roi.innerRadius,
+      r.roi.points || r.roi.outlines ? null : r.roi.innerRadius,
       r.roi.automatic ? 'Evet' : 'Hayır',
       r.roi.shape || 'circle',
-      r.roi.points ? JSON.stringify(r.roi.points) : '',
+      r.roi.outlines || r.roi.points
+        ? JSON.stringify(r.roi.outlines || r.roi.points)
+        : '',
     ]);
   }
   // One annotated preview per successful file, below the coordinate table.
@@ -191,16 +211,19 @@ async function createBatchWorkbook(entries) {
     ctx.strokeStyle = '#ffb454';
     ctx.setLineDash([5, 4]);
     ctx.beginPath();
-    if (r.roi.points) {
-      ctx.moveTo(...r.roi.points[0]);
-      for (const point of r.roi.points.slice(1)) ctx.lineTo(...point);
-      ctx.closePath();
+    const polygons = r.roi.outlines || (r.roi.points ? [r.roi.points] : null);
+    if (polygons) {
+      for (const polygon of polygons) {
+        ctx.moveTo(...polygon[0]);
+        for (const point of polygon.slice(1)) ctx.lineTo(...point);
+        ctx.closePath();
+      }
     } else ctx.arc(r.roi.x, r.roi.y, r.roi.radius, 0, 2 * Math.PI);
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.strokeStyle = '#50fa90';
     ctx.beginPath();
-    if (r.roi.points) {
+    if (polygons) {
       ctx.fillStyle = '#50fa90';
       for (const [x, y] of r.roi.innerBoundary || [])
         ctx.fillRect(x - 0.5, y - 0.5, 1, 1);

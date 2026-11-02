@@ -203,6 +203,39 @@ describe('Analysis HTTP API', () => {
     expect(reference.body.materialReference.meanDifferenceHU).toBe(214.5);
     expect(reference.body.measurements[0].mean).toBe(-24);
   });
+  it('automatically measures separate flat pieces when a circle cannot be found', async () => {
+    const data = Buffer.alloc(128 * 128);
+    for (const [top, value] of [
+      [10, 80],
+      [70, 160],
+    ])
+      for (let y = top!; y < top! + 40; y++)
+        for (let x = 40; x < 60; x++) data[y * 128 + x] = value!;
+    const image = await sharp(data, {
+      raw: { width: 128, height: 128, channels: 1 },
+    })
+      .png()
+      .toBuffer();
+    const res = await request(app.getHttpServer())
+      .post('/api/analyze')
+      .field('insetPixels', '1')
+      .attach('file', image, 'flat.png')
+      .expect(201);
+    expect(res.body.roi).toMatchObject({ automatic: true, shape: 'polygon' });
+    expect(res.body.roi.outlines).toHaveLength(2);
+    expect(res.body.measurements[0].count).toBe(1368);
+    expect(res.body.measurements[0].mean).toBeCloseTo(120, 8);
+    expect(
+      res.body.parts.map(
+        (p: { measurements: { mean: number } }) => p.measurements.mean,
+      ),
+    ).toEqual([80, 160]);
+    expect(res.body.interpretation[0]).toContain('birleşik alan');
+    await request(app.getHttpServer())
+      .post('/api/export')
+      .attach('file', image, 'flat.png')
+      .expect(201);
+  });
   it('downloads a real Excel archive', async () => {
     const res = await upload('/api/export')
       .attach('file', dicomFixture(), { filename: 'Z01.dcm' })

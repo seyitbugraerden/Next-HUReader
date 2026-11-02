@@ -50,6 +50,7 @@ export interface AnalysisResult {
   roi: Circle & {
     shape?: 'circle' | 'rectangle' | 'polygon';
     points?: [number, number][];
+    outlines?: [number, number][][];
     innerBoundary?: [number, number][];
     insetPixels: number;
     innerRadius: number;
@@ -60,6 +61,8 @@ export interface AnalysisResult {
   histogram: { lower: number; upper: number; count: number; percent: number }[];
   preview: string;
   interpretation?: string[];
+  technicalNotes?: string[];
+  parts?: { index: number; measurements: Statistics | null }[];
   lowDensity?: { threshold: number; count: number; percent: number };
   defects?: DefectCandidates;
   materialReference?: {

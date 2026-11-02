@@ -109,7 +109,9 @@
           >
             <span class="step-index">02</span
             ><span class="step-copy"
-              >Ölçüm alanını incele<small>Ayarlar ve numune sınırı</small></span
+              >Numuneyi kontrol et<small
+                >İşaretlenen bölgeyi doğrula</small
+              ></span
             ><span class="step-indicator">→</span>
           </button>
           <button
@@ -285,7 +287,7 @@
             <div class="stage-heading">
               <div>
                 <span class="eyebrow">ADIM 02 / 03</span>
-                <h2>Ölçüm alanını belirleyin</h2>
+                <h2>Numuneyi kontrol edin</h2>
                 <p>
                   Ölçümü hesaplayın, ardından görüntü üzerindeki yeşil alanı
                   kontrol edin.
@@ -316,33 +318,18 @@
                 <section class="card settings-card">
                   <div class="section-title">
                     <span class="number">02</span>
-                    <h2>Ölçüm ayarları</h2>
-                    <span class="section-meta">ROI</span>
+                    <h2>Numuneyi kontrol edin</h2>
                   </div>
                   <label class="field"
-                    >Ölçüm alanı şekli
+                    >Numunenin şekli
                     <select id="roi-shape" name="roiShape">
-                      <option value="circle">Daire</option>
-                      <option value="rectangle">Dikdörtgen</option>
-                      <option value="polygon">Serbest çokgen</option>
+                      <option value="circle">Otomatik numune alanı</option>
+                      <option value="rectangle">
+                        Yassı / dikdörtgen — alanı çiz
+                      </option>
+                      <option value="polygon">Düzensiz — sınırı çiz</option>
                     </select>
                   </label>
-                  <label class="field"
-                    >Materyal referansı
-                    <select name="materialReference" id="material-reference">
-                      <option value="marble-excel">
-                        Mermer — paylaşılan Excel
-                      </option>
-                      <option value="none">
-                        Referans karşılaştırması yapma
-                      </option>
-                    </select>
-                  </label>
-                  <p class="quiet">
-                    Excel’in örnek sonuçları hedef değer değildir. Her görüntü
-                    kendi piksellerinden hesaplanır; referans farkı tek başına
-                    kusur anlamına gelmez.
-                  </p>
                   <label class="check-row"
                     ><input
                       id="show-candidates"
@@ -368,72 +355,78 @@
                   </div>
                   <label class="check-row"
                     ><input id="manual" type="checkbox" /><span
-                      >Ölçüm alanını elle belirle<small
-                        >Kapalıyken dairesel sınır otomatik önerilir.</small
+                      >İşaretlenen alanı düzelt<small
+                        >Gerektiğinde hassas alan ayarlarını açar.</small
                       ></span
                     ></label
                   >
-                  <div class="grid-three" id="circle-fields">
-                    <label
-                      >Merkez X <span>px</span
-                      ><input
-                        name="centerX"
-                        type="number"
-                        step="any"
-                        min="0"
-                        disabled
-                        placeholder="Otomatik" /></label
-                    ><label
-                      >Merkez Y <span>px</span
-                      ><input
-                        name="centerY"
-                        type="number"
-                        step="any"
-                        min="0"
-                        disabled
-                        placeholder="Otomatik" /></label
-                    ><label
-                      >Yarıçap <span>px</span
-                      ><input
-                        name="radius"
-                        type="number"
-                        step="any"
-                        min="2"
-                        disabled
-                        placeholder="Otomatik"
-                    /></label>
-                  </div>
-                  <label class="field"
-                    >Kenar payı <span>px</span
-                    ><input
-                      name="insetPixels"
-                      type="number"
-                      min="0"
-                      step="any"
-                      placeholder="DICOM: 2,1 mm / Görsel: 10 px"
-                  /></label>
                   <p class="quiet">
-                    Kenar bulanıklığı ve destek etkisini azaltmak için numune
-                    sınırı içeri alınır.
+                    Uygulama, dış sınırdaki bulanık piksellerin etkisini
+                    azaltmak için ölçümü otomatik olarak biraz içeriden yapar.
+                    Normal kullanımda ek ayar gerekmez.
                   </p>
-                  <label class="field"
-                    >Düşük yoğunluk eşiği (isteğe bağlı)
-                    <input
-                      name="lowDensityThreshold"
-                      type="number"
-                      step="any"
-                      placeholder="Görüntünün ölçüm biriminde"
-                    />
-                  </label>
-                  <p class="quiet">
-                    Eşik ve altındaki piksel oranı raporlanır. Eşik malzemeye
-                    göre belirlenmelidir; sonuç otomatik boşluk/porozite tanısı
-                    değildir.
-                  </p>
-                  <details>
+                  <details id="advanced-settings">
                     <summary>
-                      Piksel boyutu ve kalibrasyon <span>+</span>
+                      Gelişmiş ayarlar (isteğe bağlı) <span>+</span>
                     </summary>
+                    <div class="grid-three" id="circle-fields">
+                      <label
+                        >Merkez X <span>px</span
+                        ><input
+                          name="centerX"
+                          type="number"
+                          step="any"
+                          min="0"
+                          disabled
+                          placeholder="Otomatik" /></label
+                      ><label
+                        >Merkez Y <span>px</span
+                        ><input
+                          name="centerY"
+                          type="number"
+                          step="any"
+                          min="0"
+                          disabled
+                          placeholder="Otomatik" /></label
+                      ><label
+                        >Yarıçap <span>px</span
+                        ><input
+                          name="radius"
+                          type="number"
+                          step="any"
+                          min="2"
+                          disabled
+                          placeholder="Otomatik"
+                      /></label>
+                    </div>
+                    <label class="field"
+                      >Sınırdan içeri alınan mesafe <span>piksel</span
+                      ><input
+                        name="insetPixels"
+                        type="number"
+                        min="0"
+                        step="any"
+                        placeholder="Boş bırakın: otomatik"
+                    /></label>
+                    <p class="quiet">
+                      Kenar bulanıklığı ve destek etkisini azaltmak için numune
+                      sınırı içeri alınır.
+                    </p>
+                    <label class="field"
+                      >Koyu bölge taramasını elle ayarla (isteğe bağlı)
+                      <input
+                        name="lowDensityThreshold"
+                        type="number"
+                        step="any"
+                        placeholder="Boş bırakın: otomatik"
+                      />
+                    </label>
+                    <p class="quiet">
+                      Eşik ve altındaki piksel oranı raporlanır. Eşik malzemeye
+                      göre belirlenmelidir; sonuç otomatik boşluk/porozite
+                      tanısı değildir.
+                    </p>
+
                     <p class="quiet">
                       DICOM bilgileri dosyadan okunur. Aşağıdaki alanlar
                       yalnızca PNG/JPG için geçerlidir.
@@ -623,18 +616,44 @@
             </div>
             <div id="results">
               <section class="card" style="padding: 20px; margin-bottom: 20px">
-                <h2>Sayısal değerlendirme</h2>
+                <h2>Görüntü değerlendirmesi</h2>
                 <div id="interpretation"></div>
-                <h3>Yarık / düşük yoğunluk adayları</h3>
+                <div id="part-results" hidden>
+                  <h3>Parça bazında ölçümler</h3>
+                  <p class="quiet">
+                    Genel değerler bütün işaretli parçaların birleşimidir.
+                    Parçaları ayrı değerlendirmek için bu tabloyu kullanın.
+                  </p>
+                  <div class="table-scroll">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Parça</th>
+                          <th>Piksel</th>
+                          <th>Alan (mm²)</th>
+                          <th>Ortalama</th>
+                          <th>Std. sapma</th>
+                        </tr>
+                      </thead>
+                      <tbody id="part-measurements"></tbody>
+                    </table>
+                  </div>
+                </div>
+                <h3>İncelenmesi gereken bölgeler</h3>
                 <p id="defect-summary"></p>
-                <p class="quiet">
-                  Tarama yalnızca seçili iç alanı kapsar. 8 komşulukla bağlı, en
-                  az 3 piksellik koyu bölgeler listelenir. “İnce/uzamış” bir
-                  şekil ölçütüdür; yarık doğrulaması değildir. Eşik otomatik
-                  öneriyse medyan − 3 × 1,4826 × MAD kullanılır (en az 1 birim
-                  fark). Sonuçların gerçek yarıklarla eşleşmesi henüz
-                  doğrulanmamıştır.
-                </p>
+                <details id="detection-method">
+                  <summary>Tarama yöntemi ve teknik ayrıntılar</summary>
+                  <p id="defect-settings"></p>
+                  <div id="technical-notes"></div>
+                  <p class="quiet">
+                    Tarama yalnızca seçili iç alanı kapsar. 8 komşulukla bağlı,
+                    en az 3 piksellik koyu bölgeler listelenir. “İnce/uzamış”
+                    bir şekil ölçütüdür; yarık doğrulaması değildir. Eşik
+                    otomatik öneriyse medyan − 3 × 1,4826 × MAD kullanılır (en
+                    az 1 birim fark). Sonuçların gerçek yarıklarla eşleşmesi
+                    henüz doğrulanmamıştır.
+                  </p>
+                </details>
                 <div class="table-scroll">
                   <table>
                     <thead>

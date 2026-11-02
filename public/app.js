@@ -19,7 +19,6 @@ const optionNames = [
   'roiShape',
   'roiPoints',
   'lowDensityThreshold',
-  'materialReference',
   'centerX',
   'centerY',
   'radius',
@@ -58,8 +57,6 @@ function applySettings(settings) {
   for (const key of optionNames)
     form.elements[key].value = settings.values[key] ?? '';
   form.elements.roiShape.value = settings.values.roiShape || 'circle';
-  form.elements.materialReference.value =
-    settings.values.materialReference || 'marble-excel';
   for (const key of ['centerX', 'centerY', 'radius']) {
     form.elements[key].disabled = !settings.manual;
     form.elements[key].required = settings.manual;
@@ -371,8 +368,21 @@ function dirty() {
   }
 }
 function toggleManual() {
+  if (
+    $('#manual').checked &&
+    result?.roi.outlines &&
+    form.elements.roiShape.value === 'circle'
+  ) {
+    form.elements.roiShape.value = 'polygon';
+    form.elements.roiPoints.value = '';
+    syncShapeControls();
+    dirty();
+    drawPreview();
+    return;
+  }
   const enabled =
     $('#manual').checked && form.elements.roiShape.value === 'circle';
+  if (enabled) $('#advanced-settings').open = true;
   for (const key of ['centerX', 'centerY', 'radius']) {
     form.elements[key].disabled = !enabled;
     form.elements[key].required = enabled;
@@ -384,9 +394,6 @@ function toggleManual() {
 }
 $('#manual').addEventListener('change', toggleManual);
 $('#show-candidates').addEventListener('change', drawPreview);
-$('#material-reference').addEventListener('change', () => {
-  if (!busy) dirty();
-});
 function selectedPoints() {
   try {
     return JSON.parse(form.elements.roiPoints.value || '[]');
@@ -656,6 +663,21 @@ function drawPreview() {
   ctx.drawImage(previewImage, 0, 0);
   if (candidateOverlay && !resultDirty && $('#show-candidates').checked)
     ctx.drawImage(candidateOverlay, 0, 0);
+  if (result?.roi.outlines && !resultDirty && !$('#manual').checked) {
+    ctx.lineWidth = Math.max(1, canvas.width / 350);
+    ctx.strokeStyle = '#ffb454';
+    for (const polygon of result.roi.outlines) {
+      ctx.beginPath();
+      ctx.moveTo(...polygon[0]);
+      for (const point of polygon.slice(1)) ctx.lineTo(...point);
+      ctx.closePath();
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#50fa90';
+    for (const [x, y] of result.roi.innerBoundary || [])
+      ctx.fillRect(x - 0.5, y - 0.5, 1, 1);
+    return;
+  }
   if (form.elements.roiShape.value !== 'circle') {
     let points = selectedPoints();
     if (form.elements.roiShape.value === 'rectangle' && points.length === 2) {
@@ -779,7 +801,7 @@ function setBusy(value) {
   syncWorkflow();
   // Preserve the current field disabled state while a request is in progress.
   for (const input of form.querySelectorAll(
-    'input:not([type=file]), select[name=roiShape], select[name=materialReference]',
+    'input:not([type=file]), select[name=roiShape]',
   )) {
     if (value) {
       input.dataset.wasDisabled = String(input.disabled);
@@ -869,10 +891,39 @@ function renderResults(updateCoordinates = true) {
     overlay.src = result.defects.overlay;
   }
   loadPreview(result.preview);
+  $('#part-results').hidden = !result.parts;
+  $('#part-measurements').replaceChildren(
+    ...(result.parts || []).map((part) => {
+      const row = document.createElement('tr'),
+        m = part.measurements;
+      for (const value of [
+        part.index,
+        integer(m?.count ?? 0),
+        fmt(m?.area),
+        fmt(m?.mean),
+        fmt(m?.std),
+      ]) {
+        const cell = document.createElement('td');
+        cell.textContent = value;
+        row.append(cell);
+      }
+      return row;
+    }),
+  );
   const defects = result.defects;
   $('#defect-summary').textContent = defects
-    ? `${defects.count} aday bölge; ${defects.elongatedCount} ince/uzamış aday. Aday alan oranı %${fmt(defects.percent, 2)}. Eşik: ${fmt(defects.threshold, 2)} ${unitLabel(result.unit)} (${defects.thresholdSource === 'user' ? 'elle seçilmiş' : 'otomatik öneri'}).${defects.truncated ? ' En büyük 50 bölge listeleniyor; toplamlar tüm adayları kapsar.' : ''}`
+    ? `${defects.count} aday bölge; ${defects.elongatedCount} ince/uzamış aday. İşaretli alan oranı %${fmt(defects.percent, 2)}.${defects.truncated ? ' En büyük 50 bölge listeleniyor; toplamlar tüm adayları kapsar.' : ''}`
     : 'Bu sonuç için aday bölge taraması bulunmuyor.';
+  $('#defect-settings').textContent = defects
+    ? `Tarama eşiği: ${fmt(defects.threshold, 2)} ${unitLabel(result.unit)} (${defects.thresholdSource === 'user' ? 'elle seçilmiş' : 'otomatik'}).`
+    : '';
+  $('#technical-notes').replaceChildren(
+    ...(result.technicalNotes || []).map((text) => {
+      const p = document.createElement('p');
+      p.textContent = text;
+      return p;
+    }),
+  );
   $('#defect-regions').replaceChildren(
     ...(defects?.regions || []).map((region, index) => {
       const row = document.createElement('tr');
@@ -956,7 +1007,7 @@ function renderResults(updateCoordinates = true) {
       ? `${fmt(result.spacing[0], 4)} × ${fmt(result.spacing[1], 4)} mm`
       : 'Belirtilmedi',
     'Ölçüm birimi': unitLabel(result.unit),
-    'Kenar payı': `${fmt(result.roi.insetPixels, 2)} px`,
+    'Dış sınırdan içeri alınan mesafe': `${fmt(result.roi.insetPixels, 2)} piksel`,
     Seçim: result.roi.automatic ? 'Otomatik öneri' : 'Elle belirlenmiş',
   };
   $('#metadata').replaceChildren(
