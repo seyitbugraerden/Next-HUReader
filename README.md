@@ -55,6 +55,10 @@ Aday sayısı, piksel alanı ve oranı, varsa mm² alan, ortalama, kapsayan kutu
 
 Bu yöntem gözenek, mineral/doku değişimi, kısmi hacim etkisi ve artefaktları yarıktan kesin ayıramaz. Bulunmayan bir aday, yarık bulunmadığını kanıtlamaz; aday alan oranı 3B porozite değildir. Etiketli sağlam/yarıklı referans kesitler olmadan duyarlılık/özgüllük veya doğruluk yüzdesi iddia edilmez. Harici görsel yapay zekâ modeli henüz kullanılmıyor.
 
+## Görüntü üzerinde sürükleyerek seçim
+
+Normal modda görüntüye basılı tutup sürüklemek dikdörtgen seçim başlatır. Düzensiz modda sürükleyerek serbest sınır çizilebilir; köşelere tek tek tıklama da korunmuştur. Daireyi elle düzenlerken merkezden dışarı sürüklenir; boş yarıçapla görünmez seçim oluşmaması için başlangıç dairesi hazırlanır. Sınır ve yarı saydam turuncu dolgu sürükleme sırasında görünür. Gösterim katmanı özgün görüntü piksellerini değiştirmez. Görsel dışına taşan sürükleme görüntü içinde sınırlanır; Escape yeni çizimi iptal ederek önceki seçimi geri getirir. Serbest çizim en fazla 128 köşeye indirgenir, kendini kesen alanlar analizde reddedilir.
+
 ## Ölçümler
 
 - Kenar payı uygulanmış numune, tam numune ve tüm geçerli görüntü için piksel sayısı, alan, ortalama, popülasyon standart sapması, medyan, minimum, maksimum ve %5/%95 yüzdelikleri.

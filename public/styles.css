@@ -796,6 +796,7 @@ details .grid-two {
   color: #2b897e;
 }
 .viewer canvas {
+  touch-action: none;
   max-width: 100%;
   max-height: 520px;
   object-fit: contain;

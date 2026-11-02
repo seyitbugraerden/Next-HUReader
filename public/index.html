@@ -527,7 +527,7 @@
                     <canvas
                       id="image-canvas"
                       hidden
-                      aria-label="Numune kesiti ve ölçüm çemberi"
+                      aria-label="Numune görüntüsü ve seçilen alan"
                     ></canvas
                     ><span class="viewer-corner"
                       >CT VIEWPORT <span>•</span> ROI</span
@@ -538,10 +538,19 @@
                     ><span><i class="legend orange"></i>Numune dış sınırı</span
                     ><span id="dimensions">— × — px</span>
                   </div>
+                  <p
+                    id="selection-guide"
+                    class="quiet"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    Görüntü üzerinde basılı tutup sürükleyerek alan
+                    seçebilirsiniz.
+                  </p>
                   <p class="quiet canvas-hint" id="canvas-hint" hidden>
-                    Elle seçim açıkken görüntüye tıklayarak merkezi
-                    taşıyabilirsiniz. Değişiklikleri uygulamak için yeniden
-                    analiz edin.
+                    Dairenin merkezinden dışarı doğru sürükleyin. Tek tıklama
+                    merkezi taşır. Değişiklikten sonra ölçümü yeniden
+                    hesaplayın.
                   </p>
                 </section>
                 <div

@@ -8,6 +8,8 @@ let result = null;
 let analyzedBody = null;
 let previewImage = null;
 let candidateOverlay = null;
+let selectionDrag = null;
+let suppressCanvasClickUntil = 0;
 let previewRevision = 0;
 let currentPreviewUrl = null;
 let busy = false;
@@ -173,6 +175,8 @@ function renderQueue() {
   );
 }
 function selectEntry(id, save = true) {
+  selectionDrag = null;
+  suppressCanvasClickUntil = 0;
   if (save) saveCurrent();
   activeId = id;
   const entry = activeEntry();
@@ -390,7 +394,10 @@ function toggleManual() {
   }
   const enabled =
     $('#manual').checked && form.elements.roiShape.value === 'circle';
-  if (enabled) $('#advanced-settings').open = true;
+  if (enabled) {
+    $('#advanced-settings').open = true;
+    initializeManualCircle();
+  }
   for (const key of ['centerX', 'centerY', 'radius']) {
     form.elements[key].disabled = !enabled;
     form.elements[key].required = enabled;
@@ -433,10 +440,17 @@ function syncShapeControls() {
     form.elements[key].required = circular && $('#manual').checked;
   }
   $('#canvas-hint').hidden = !circular || !$('#manual').checked;
+  $('#selection-guide').textContent = circular
+    ? $('#manual').checked
+      ? 'Merkezden dışarı sürükleyerek daire çizin.'
+      : 'Basılı tutup sürükleyin; seçtiğiniz alan turuncu olarak görünür.'
+    : shape === 'rectangle'
+      ? 'Basılı tutup sürükleyerek dikdörtgen çizin veya iki köşeye tıklayın.'
+      : 'Basılı tutup sınırı çizin veya köşelere tıklayın. Seçili alan turuncu görünür.';
   $('#roi-guidance').textContent =
     (shape === 'rectangle'
-      ? 'Dikdörtgenin iki karşı köşesine tıklayın.'
-      : 'Numune sınırına sırayla tıklayın (3–128 köşe). Son köşe ilkine otomatik bağlanır.') +
+      ? 'Dikdörtgeni sürükleyerek çizin veya iki karşı köşeye tıklayın.'
+      : 'Sınırı basılı tutup çizin veya köşelere sırayla tıklayın. Son köşe ilkine otomatik bağlanır.') +
     ` ${selectedPoints().length} köşe seçildi. Yeşil iç sınır hesaplamadan sonra gösterilir.`;
 }
 form.elements.roiShape.addEventListener('change', () => {
@@ -648,6 +662,7 @@ function loadPreview(url) {
     $('#image-canvas').hidden = false;
     $('#empty').hidden = true;
     $('#dimensions').textContent = `${image.width} × ${image.height} px`;
+    initializeManualCircle();
     drawPreview();
   };
   image.src = url;
@@ -679,6 +694,9 @@ function drawPreview() {
   canvas.width = previewImage.width;
   canvas.height = previewImage.height;
   const ctx = canvas.getContext('2d');
+  const screen = canvas.getBoundingClientRect();
+  const scale =
+    Math.min(screen.width / canvas.width, screen.height / canvas.height) || 1;
   ctx.drawImage(previewImage, 0, 0);
   if (candidateOverlay && !resultDirty && $('#show-candidates').checked)
     ctx.drawImage(candidateOverlay, 0, 0);
@@ -708,16 +726,33 @@ function drawPreview() {
         [a[0], b[1]],
       ];
     }
-    ctx.lineWidth = Math.max(1, canvas.width / 350);
+    ctx.lineWidth = 3 / scale;
     ctx.strokeStyle = '#ffb454';
     ctx.fillStyle = '#ffb454';
     if (points.length) {
       ctx.beginPath();
       ctx.moveTo(...points[0]);
       for (const point of points.slice(1)) ctx.lineTo(...point);
-      if (points.length >= 3) ctx.closePath();
+      if (points.length >= 3) {
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(255, 180, 84, .18)';
+        ctx.fill();
+      }
+      ctx.strokeStyle = '#17212b';
+      ctx.lineWidth = 5 / scale;
       ctx.stroke();
-      for (const [x, y] of points) ctx.fillRect(x - 2, y - 2, 4, 4);
+      ctx.strokeStyle = '#ffb454';
+      ctx.lineWidth = 3 / scale;
+      ctx.stroke();
+      for (const [x, y] of points) {
+        ctx.beginPath();
+        ctx.arc(x, y, 5 / scale, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffb454';
+        ctx.fill();
+        ctx.strokeStyle = '#17212b';
+        ctx.lineWidth = 1 / scale;
+        ctx.stroke();
+      }
     }
     if (result && !resultDirty) {
       ctx.fillStyle = '#50fa90';
@@ -763,7 +798,193 @@ function drawPreview() {
   ctx.fillRect(roi.x - 1, roi.y - 4, 2, 8);
   ctx.fillRect(roi.x - 4, roi.y - 1, 8, 2);
 }
+function initializeManualCircle() {
+  if (
+    !previewImage ||
+    !$('#manual').checked ||
+    form.elements.roiShape.value !== 'circle'
+  )
+    return;
+  if (
+    form.elements.radius.value !== '' &&
+    Number(form.elements.radius.value) > 0
+  )
+    return;
+  form.elements.centerX.value = (previewImage.width / 2).toFixed(1);
+  form.elements.centerY.value = (previewImage.height / 2).toFixed(1);
+  form.elements.radius.value = (
+    Math.min(previewImage.width, previewImage.height) / 4
+  ).toFixed(1);
+}
+function canvasPoint(event, clamp = false) {
+  const canvas = $('#image-canvas'),
+    rect = canvas.getBoundingClientRect();
+  const scale = Math.min(
+    rect.width / canvas.width,
+    rect.height / canvas.height,
+  );
+  if (!scale) return null;
+  let x =
+    (event.clientX - rect.left - (rect.width - canvas.width * scale) / 2) /
+    scale;
+  let y =
+    (event.clientY - rect.top - (rect.height - canvas.height * scale) / 2) /
+    scale;
+  if (clamp) {
+    x = Math.max(0, Math.min(canvas.width - 1, x));
+    y = Math.max(0, Math.min(canvas.height - 1, y));
+  }
+  if (x < 0 || y < 0 || x >= canvas.width || y >= canvas.height) return null;
+  return { x: Math.round(x), y: Math.round(y), scale };
+}
+function cancelSelectionDrag() {
+  const drag = selectionDrag;
+  selectionDrag = null;
+  if (!drag || drag.entryId !== activeId) return;
+  if (drag.moved) {
+    applySettings(drag.original);
+    resultDirty = drag.originalDirty;
+    activeEntry().error = drag.originalError;
+    activeEntry().needsArea = drag.originalNeedsArea;
+    syncWorkflow();
+    drawPreview();
+    suppressCanvasClickUntil = performance.now() + 250;
+  }
+  try {
+    $('#image-canvas').releasePointerCapture(drag.pointerId);
+  } catch {}
+}
+$('#image-canvas').addEventListener('pointerdown', (event) => {
+  if (busy || !previewImage || event.button !== 0) return;
+  const point = canvasPoint(event);
+  if (!point) return;
+  const shape = form.elements.roiShape.value;
+  selectionDrag = {
+    start: point,
+    points: [[point.x, point.y]],
+    pointerId: event.pointerId,
+    clientX: event.clientX,
+    clientY: event.clientY,
+    entryId: activeId,
+    moved: false,
+    shape: shape === 'circle' && !$('#manual').checked ? 'rectangle' : shape,
+    original: captureSettings(),
+    originalDirty: resultDirty,
+    originalError: activeEntry().error,
+    originalNeedsArea: activeEntry().needsArea,
+  };
+  $('#image-canvas').setPointerCapture(event.pointerId);
+});
+$('#image-canvas').addEventListener('pointermove', (event) => {
+  const drag = selectionDrag;
+  if (
+    !drag ||
+    drag.pointerId !== event.pointerId ||
+    drag.entryId !== activeId ||
+    busy
+  )
+    return;
+  if (
+    !drag.moved &&
+    Math.hypot(event.clientX - drag.clientX, event.clientY - drag.clientY) < 4
+  )
+    return;
+  const point = canvasPoint(event, true);
+  if (!point) return;
+  event.preventDefault();
+  if (!drag.moved) {
+    drag.moved = true;
+    form.elements.roiShape.value = drag.shape;
+    if (drag.shape === 'polygon') form.elements.roiPoints.value = '';
+    if (drag.shape !== 'circle') $('#manual').checked = true;
+    form.elements.roiPoints.disabled = drag.shape === 'circle';
+    // Keep the layout fixed until release so the canvas stays under the pointer.
+    resultDirty = true;
+    activeEntry().dirty = true;
+    activeEntry().error = null;
+    activeEntry().needsArea = false;
+  }
+  if (drag.shape === 'rectangle') {
+    form.elements.roiPoints.value = JSON.stringify([
+      [drag.start.x, drag.start.y],
+      [point.x, point.y],
+    ]);
+  } else if (drag.shape === 'circle') {
+    form.elements.centerX.value = String(drag.start.x);
+    form.elements.centerY.value = String(drag.start.y);
+    const limit = Math.min(
+      drag.start.x,
+      drag.start.y,
+      previewImage.width - drag.start.x,
+      previewImage.height - drag.start.y,
+    );
+    form.elements.radius.value = Math.min(
+      limit,
+      Math.hypot(point.x - drag.start.x, point.y - drag.start.y),
+    ).toFixed(1);
+  } else {
+    const last = drag.points.at(-1);
+    if (
+      Math.hypot(point.x - last[0], point.y - last[1]) >=
+      Math.max(1, 2 / point.scale)
+    )
+      drag.points.push([point.x, point.y]);
+    if (drag.points.length > 512)
+      drag.points = drag.points.filter(
+        (_, i) => i % 2 === 0 || i === drag.points.length - 1,
+      );
+    form.elements.roiPoints.value = JSON.stringify(drag.points);
+  }
+  drawPreview();
+});
+$('#image-canvas').addEventListener('pointerup', (event) => {
+  const drag = selectionDrag;
+  if (!drag || drag.pointerId !== event.pointerId) return;
+  selectionDrag = null;
+  try {
+    $('#image-canvas').releasePointerCapture(event.pointerId);
+  } catch {}
+  if (!drag.moved || drag.entryId !== activeId) return;
+  event.preventDefault();
+  suppressCanvasClickUntil = performance.now() + 250;
+  if (drag.shape === 'polygon') {
+    let points = selectedPoints();
+    if (
+      points.length > 3 &&
+      Math.hypot(
+        points.at(-1)[0] - points[0][0],
+        points.at(-1)[1] - points[0][1],
+      ) <= Math.max(1, 6 / drag.start.scale)
+    )
+      points.pop();
+    if (points.length > 128)
+      points = Array.from(
+        { length: 128 },
+        (_, i) => points[Math.round((i * (points.length - 1)) / 127)],
+      );
+    form.elements.roiPoints.value = JSON.stringify(points);
+  }
+  const top = $('#image-canvas').getBoundingClientRect().top;
+  syncShapeControls();
+  dirty();
+  drawPreview();
+  const shift = $('#image-canvas').getBoundingClientRect().top - top;
+  if (shift) window.scrollBy(0, shift);
+  $('#selection-guide').textContent =
+    'Seçtiğiniz alan turuncu gösteriliyor. Sonuçları güncellemek için ölçümü hesaplayın.';
+});
+$('#image-canvas').addEventListener('pointercancel', cancelSelectionDrag);
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && selectionDrag) {
+    event.preventDefault();
+    cancelSelectionDrag();
+  }
+});
 $('#image-canvas').addEventListener('click', (event) => {
+  if (performance.now() < suppressCanvasClickUntil) {
+    suppressCanvasClickUntil = 0;
+    return;
+  }
   if (
     (!$('#manual').checked && form.elements.roiShape.value === 'circle') ||
     busy
@@ -840,7 +1061,7 @@ async function readError(response) {
 }
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
-  if (busy) return;
+  if (busy || selectionDrag?.moved) return;
   if (currentStep === 1 && file) {
     setWorkflow(2, true);
     return;
