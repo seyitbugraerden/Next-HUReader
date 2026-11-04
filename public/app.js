@@ -34,6 +34,13 @@ const entryLabel = (entry) => entry.relativePath || entry.file.name;
 const activeEntry = () => entries.find((entry) => entry.id === activeId);
 const readyEntries = () =>
   entries.filter((entry) => entry.result && !entry.dirty);
+const defectEditor = window.createDefectEditor({
+  getReview: () => activeEntry()?.defectReview,
+  isBusy: () => busy || importing,
+  onChange: () => dirty(true),
+  redraw: () => drawPreview(),
+  onError: (message) => showError(message),
+});
 function captureSettings() {
   return {
     manual: $('#manual').checked,
@@ -108,10 +115,7 @@ function renderQueue() {
       select.type = 'button';
       select.className = 'queue-preview-select';
       select.disabled = busy || importing;
-      select.setAttribute(
-        'aria-label',
-        `${entryLabel(entry)} görselini seç`,
-      );
+      select.setAttribute('aria-label', `${entryLabel(entry)} görselini seç`);
       select.addEventListener('click', () => selectEntry(entry.id));
       if (entry.thumbnailUrl) {
         const image = document.createElement('img');
@@ -208,6 +212,7 @@ function renderQueue() {
   );
 }
 function selectEntry(id, save = true) {
+  defectEditor.cancel();
   selectionDrag = null;
   suppressCanvasClickUntil = 0;
   if (save) saveCurrent();
@@ -266,6 +271,7 @@ function selectEntry(id, save = true) {
   } else if (entry) {
     loadDicomPreview(entry);
   }
+  if (entry?.defectReview) loadPreview(entry.defectReview.base.preview);
   syncWorkflow();
 }
 function removeEntry(id) {
@@ -336,6 +342,7 @@ function showError(message) {
 }
 function syncWorkflow() {
   saveCurrent();
+  defectEditor.sync();
   $('#draw-area').hidden = currentStep !== 2 || !activeEntry()?.needsArea;
   $('#draw-area').disabled = busy || importing;
   const hasReady = readyEntries().length > 0;
@@ -422,7 +429,14 @@ for (const button of document.querySelectorAll('[data-step]'))
   button.addEventListener('click', () =>
     setWorkflow(Number(button.dataset.step), true),
   );
-function dirty() {
+function dirty(defectOnly = false) {
+  if (!defectOnly && activeEntry()?.defectReview) {
+    defectEditor.cancel();
+    activeEntry().defectReview = null;
+    $('#status').textContent =
+      'Ölçüm ayarları değişti. Boşluk düzenlemeleri sıfırlandı; ön analizi yeniden çalıştırın.';
+    $('#status').hidden = false;
+  }
   resultDirty = true;
   $('#batch-progress').hidden = true;
   if (activeEntry()) {
@@ -493,8 +507,7 @@ function syncShapeControls() {
   $('#polygon-tools').hidden = circular;
   form.elements.roiPoints.disabled = busy || circular;
   for (const key of ['centerX', 'centerY', 'radius']) {
-    form.elements[key].disabled =
-      busy || !circular || !$('#manual').checked;
+    form.elements[key].disabled = busy || !circular || !$('#manual').checked;
     form.elements[key].required = circular && $('#manual').checked;
   }
   const hasPoints = selectedPoints().length > 0;
@@ -803,6 +816,8 @@ async function loadDicomPreview(entry) {
 }
 function drawPreview() {
   if (!previewImage) return;
+  const view = activeEntry()?.defectReview?.base ?? result;
+  const current = !!activeEntry()?.defectReview || !resultDirty;
   const canvas = $('#image-canvas');
   canvas.width = previewImage.width;
   canvas.height = previewImage.height;
@@ -811,12 +826,13 @@ function drawPreview() {
   const scale =
     Math.min(screen.width / canvas.width, screen.height / canvas.height) || 1;
   ctx.drawImage(previewImage, 0, 0);
-  if (candidateOverlay && !resultDirty && $('#show-candidates').checked)
+  const editing = defectEditor.draw(ctx);
+  if (!editing && candidateOverlay && current && $('#show-candidates').checked)
     ctx.drawImage(candidateOverlay, 0, 0);
-  if (result?.roi.outlines && !resultDirty && !$('#manual').checked) {
+  if (view?.roi.outlines && current && !$('#manual').checked) {
     ctx.lineWidth = Math.max(1, canvas.width / 350);
     ctx.strokeStyle = '#ffb454';
-    for (const polygon of result.roi.outlines) {
+    for (const polygon of view.roi.outlines) {
       ctx.beginPath();
       ctx.moveTo(...polygon[0]);
       for (const point of polygon.slice(1)) ctx.lineTo(...point);
@@ -824,7 +840,7 @@ function drawPreview() {
       ctx.stroke();
     }
     ctx.fillStyle = '#50fa90';
-    for (const [x, y] of result.roi.innerBoundary || [])
+    for (const [x, y] of view.roi.innerBoundary || [])
       ctx.fillRect(x - 0.5, y - 0.5, 1, 1);
     return;
   }
@@ -867,9 +883,9 @@ function drawPreview() {
         ctx.stroke();
       }
     }
-    if (result && !resultDirty) {
+    if (view && current) {
       ctx.fillStyle = '#50fa90';
-      for (const [x, y] of result.roi.innerBoundary || [])
+      for (const [x, y] of view.roi.innerBoundary || [])
         ctx.fillRect(x - 0.5, y - 0.5, 1, 1);
     }
     return;
@@ -881,7 +897,7 @@ function drawPreview() {
         y: Number(form.elements.centerY.value),
         radius: Number(form.elements.radius.value),
       }
-    : result?.roi;
+    : view?.roi;
   if (
     !roi ||
     !Number.isFinite(roi.radius) ||
@@ -893,7 +909,7 @@ function drawPreview() {
   const inset =
     form.elements.insetPixels.value !== ''
       ? Number(form.elements.insetPixels.value)
-      : (result?.roi.insetPixels ?? 10);
+      : (view?.roi.insetPixels ?? 10);
   ctx.lineWidth = Math.max(1, canvas.width / 350);
   ctx.strokeStyle = '#ffb454';
   ctx.setLineDash([canvas.width / 70, canvas.width / 100]);
@@ -1172,9 +1188,52 @@ async function readError(response) {
   error.code = json?.code;
   return error;
 }
+$('#preview-defects').addEventListener('click', async () => {
+  if (!file || busy || defectEditor.dragging) return;
+  let body;
+  try {
+    body = requestBody();
+  } catch (error) {
+    showError(error.message);
+    return;
+  }
+  body.delete('defectEdits');
+  const entry = activeEntry();
+  setBusy(true);
+  $('#error').hidden = true;
+  $('#status').hidden = false;
+  $('#status').textContent = 'Boşluk adayları ön analiz için hazırlanıyor…';
+  try {
+    const response = await fetch('/api/defects/preview', {
+      method: 'POST',
+      body,
+    });
+    if (!response.ok) throw await readError(response);
+    const base = await response.json();
+    entry.defectReview = {
+      base,
+      edits: [],
+      history: [],
+      selected: null,
+      vertex: null,
+    };
+    resultDirty = true;
+    $('#show-candidates').checked = true;
+    $('#edit-defects').checked = true;
+    loadPreview(base.preview);
+    $('#status').textContent =
+      'Ön analiz hazır. Boşlukları düzenleyin, ardından “Ölçümü hesapla” ile onaylayın. Ön analiz rapora dahil edilmez.';
+  } catch (error) {
+    showError(error.message);
+    entry.needsArea = error.code === 'ROI_REQUIRED';
+    $('#status').hidden = true;
+  } finally {
+    setBusy(false);
+  }
+});
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
-  if (busy || selectionDrag?.moved) return;
+  if (busy || selectionDrag?.moved || defectEditor.dragging) return;
   if (currentStep === 1 && file) {
     setWorkflow(2, true);
     return;
@@ -1271,7 +1330,7 @@ function renderResults(updateCoordinates = true) {
   );
   const defects = result.defects;
   $('#defect-summary').textContent = defects
-    ? `${defects.count} aday bölge; ${defects.elongatedCount} ince/uzamış aday. İşaretli alan oranı %${fmt(defects.percent, 2)}.${defects.truncated ? ' En büyük 50 bölge listeleniyor; toplamlar tüm adayları kapsar.' : ''}`
+    ? `${defects.count} aday bölge; ${defects.elongatedCount} ince/uzamış aday. İşaretli alan oranı %${fmt(defects.percent, 2)}.${defects.manuallyEdited ? ' Kullanıcının boşluk düzeltmeleri uygulanmıştır.' : ''}${defects.truncated ? ' En büyük 50 bölge listeleniyor; toplamlar tüm adayları kapsar.' : ''}`
     : 'Bu sonuç için aday bölge taraması bulunmuyor.';
   $('#defect-settings').textContent = defects
     ? `Tarama eşiği: ${fmt(defects.threshold, 2)} ${unitLabel(result.unit)} (${defects.thresholdSource === 'user' ? 'elle seçilmiş' : 'otomatik'}).`
@@ -1532,6 +1591,8 @@ function bodyForEntry(entry) {
   const body = new FormData();
   body.set('file', entry.file);
   body.set('sourcePath', entryLabel(entry));
+  if (entry.defectReview?.edits.length)
+    body.set('defectEdits', JSON.stringify(entry.defectReview.edits));
   for (const key of optionNames) {
     if (key === 'roiPoints' && shape === 'circle') continue;
     if (

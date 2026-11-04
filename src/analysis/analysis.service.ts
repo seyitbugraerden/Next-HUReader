@@ -39,6 +39,45 @@ export function parseOptions(input: Record<string, unknown>): AnalysisOptions {
     result[key] = value;
   }
   const options = result as AnalysisOptions;
+  if (input.defectEdits !== undefined && input.defectEdits !== '') {
+    try {
+      const edits: unknown =
+        typeof input.defectEdits === 'string'
+          ? JSON.parse(input.defectEdits)
+          : input.defectEdits;
+      if (!Array.isArray(edits) || edits.length > 50) throw new Error();
+      const ids = new Set<number>();
+      for (const edit of edits) {
+        if (
+          !edit ||
+          typeof edit !== 'object' ||
+          !Number.isSafeInteger(edit.id) ||
+          edit.id < 1 ||
+          ids.has(edit.id)
+        )
+          throw new Error();
+        ids.add(edit.id);
+        if (
+          edit.points !== null &&
+          (!Array.isArray(edit.points) ||
+            edit.points.length < 3 ||
+            edit.points.length > 512 ||
+            !edit.points.every(
+              (p: unknown) =>
+                Array.isArray(p) &&
+                p.length === 2 &&
+                p.every((v) => typeof v === 'number' && Number.isFinite(v)),
+            ))
+        )
+          throw new Error();
+      }
+      options.defectEdits = edits;
+    } catch {
+      throw new BadRequestException(
+        'Boşluk düzenlemeleri geçerli ve benzersiz adaylar ile 3–512 köşeden oluşmalıdır.',
+      );
+    }
+  }
   if (input.materialReference !== undefined) {
     if (
       input.materialReference !== 'none' &&
@@ -444,11 +483,16 @@ export class AnalysisService {
         `${format(lowDensity.threshold)} ${unit} ve altındaki pikseller seçili alanın %${format(lowDensity.percent)}'i. Bu oran boşluk/porozite ölçümü olarak doğrulanmamıştır.`,
       );
     }
-    const { mask: defectMask, ...candidateData } = findDefectCandidates(
+    const {
+      mask: defectMask,
+      labels: defectLabels,
+      ...candidateData
+    } = findDefectCandidates(
       image,
       innerMask,
       sample,
       options.lowDensityThreshold,
+      options.defectEdits,
     );
     const rgba = Buffer.alloc(width * height * 4);
     for (let i = 0; i < defectMask.length; i++)
@@ -461,12 +505,25 @@ export class AnalysisService {
     const defectPng = await sharp(rgba, { raw: { width, height, channels: 4 } })
       .png()
       .toBuffer();
+    const labelBytes = Buffer.alloc(width * height * 3);
+    for (let i = 0; i < defectLabels.length; i++) {
+      const id = defectLabels[i]!;
+      labelBytes[i * 3] = id & 255;
+      labelBytes[i * 3 + 1] = (id >>> 8) & 255;
+      labelBytes[i * 3 + 2] = (id >>> 16) & 255;
+    }
+    const labelPng = await sharp(labelBytes, {
+      raw: { width, height, channels: 3 },
+    })
+      .png()
+      .toBuffer();
     const defects = {
       ...candidateData,
+      labelMap: `data:image/png;base64,${labelPng.toString('base64')}`,
       overlay: `data:image/png;base64,${defectPng.toString('base64')}`,
     };
     interpretation.push(
-      `${defects.count} düşük yoğunluklu aday bölge bulundu; ${defects.elongatedCount} tanesi ince/uzamış geometri ölçütünü karşılıyor. Bu bölgeler yarık, boşluk, malzeme dokusu veya görüntüleme etkisi olabilir; doğrulanmış yarık sayısı değildir.`,
+      `${defects.count} ${defects.manuallyEdited ? 'elle düzenlenmiş' : 'düşük yoğunluklu'} aday bölge bulundu; ${defects.elongatedCount} tanesi ince/uzamış geometri ölçütünü karşılıyor. Bu bölgeler yarık, boşluk, malzeme dokusu veya görüntüleme etkisi olabilir; doğrulanmış yarık sayısı değildir.`,
     );
     interpretation.push(
       `Aday bölgelerin piksel alanı oranı %${format(defects.percent)}. ${defects.boundaryCount} bölge ölçüm sınırına temas ediyor; numune dışı alan veya kırpılmış yapı etkisi kontrol edilmelidir.`,
@@ -476,6 +533,10 @@ export class AnalysisService {
         ? `Aday tarama eşiği kullanıcı tarafından ${format(defects.threshold)} ${unit} olarak seçildi.`
         : `Aday tarama eşiği bu görüntünün medyan ve mutlak sapmasından ${format(defects.threshold)} ${unit} olarak otomatik önerildi; malzeme için kalibre edilmiş kabul eşiği değildir.`,
     ];
+    if (defects.manuallyEdited)
+      technicalNotes.push(
+        'Boşluk adayları kullanıcı tarafından silindi veya serbest çokgen ile düzenlendi. Aday istatistikleri düzenlenen birleşik maskeden hesaplandı; genel yoğunluk ölçümleri değiştirilmedi. Ölçüm alanı dışındaki pikseller aday hesabına alınmadı.',
+      );
     let materialReference: AnalysisResult['materialReference'];
     if (options.materialReference === 'marble-excel') {
       if (image.unit === 'HU') {

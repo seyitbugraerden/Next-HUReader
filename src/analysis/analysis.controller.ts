@@ -19,8 +19,8 @@ import { AnalysisService, parseOptions } from './analysis.service.js';
     limits: {
       fileSize: 20 * 1024 * 1024,
       files: 1,
-      fields: 13,
-      fieldSize: 16384,
+      fields: 14,
+      fieldSize: 1024 * 1024,
     },
   }),
 )
@@ -72,6 +72,20 @@ export class AnalysisController {
       typeof sourcePath === 'string' ? sourcePath : file.originalname,
       parseOptions(body),
     );
+  }
+
+  @Post('defects/preview')
+  async previewDefects(
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Body() body: Record<string, unknown>,
+    @Res() response: Response,
+  ) {
+    const { defects, roi, preview, width, height, unit } = await this.analyze(
+      file,
+      { ...body, defectEdits: undefined },
+    );
+    response.setHeader('Cache-Control', 'no-store');
+    return response.json({ defects, roi, preview, width, height, unit });
   }
 
   @Post('analyze')

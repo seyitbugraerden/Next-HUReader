@@ -3643,3 +3643,68 @@ footer {
     transform: scaleY(1);
   }
 }
+
+.defect-review {
+  margin-block: 18px;
+  padding-block: 14px;
+  border-top: 1px solid #dce6ef;
+}
+.defect-review > button {
+  width: 100%;
+}
+.defect-editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+#defect-editor-overlay {
+  position: absolute;
+  z-index: 3;
+  pointer-events: none;
+  overflow: visible;
+  touch-action: none;
+}
+#defect-editor-overlay[hidden] {
+  display: none;
+}
+.defect-edit-polygon {
+  fill: transparent;
+  stroke: #ff56cb;
+  stroke-width: 1;
+  pointer-events: all;
+  cursor: pointer;
+}
+.defect-edit-polygon.selected {
+  stroke: #fff;
+  stroke-width: 2;
+}
+.defect-edit-point {
+  fill: #fff;
+  stroke: #af196f;
+  stroke-width: 2;
+  cursor: grab;
+  pointer-events: all;
+}
+.defect-edit-point.selected {
+  fill: #ffc6ed;
+}
+.defect-remove {
+  pointer-events: all;
+  cursor: pointer;
+}
+.defect-remove circle {
+  fill: #b92049;
+  stroke: white;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.defect-remove text {
+  fill: white;
+  font-family: sans-serif;
+  pointer-events: none;
+}
+.defect-remove:focus circle,
+.defect-edit-point:focus {
+  stroke: #50fa90;
+  stroke-width: 3;
+}

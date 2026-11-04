@@ -27,10 +27,11 @@ export function validatePolygon(
   points: Point[],
   width: number,
   height: number,
+  maxPoints = 128,
 ) {
   if (
     points.length < 3 ||
-    points.length > 128 ||
+    points.length > maxPoints ||
     points.some(
       (p) =>
         p.length !== 2 ||
@@ -41,7 +42,9 @@ export function validatePolygon(
         p[1] > height,
     )
   )
-    throw new BadRequestException('Görüntü içinde 3–128 geçerli köşe seçin.');
+    throw new BadRequestException(
+      `Görüntü içinde 3–${maxPoints} geçerli köşe seçin.`,
+    );
   let area = 0;
   for (let i = 0; i < points.length; i++) {
     const a = points[i]!,

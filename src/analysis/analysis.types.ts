@@ -1,4 +1,10 @@
+export interface DefectEdit {
+  id: number;
+  points: [number, number][] | null;
+}
+
 export interface AnalysisOptions {
+  defectEdits?: DefectEdit[];
   roiShape?: 'circle' | 'rectangle' | 'polygon';
   roiPoints?: [number, number][];
   lowDensityThreshold?: number;
@@ -81,6 +87,9 @@ export interface AnalysisResult {
 }
 
 export interface DefectRegion {
+  id: number;
+  outline: [number, number][];
+  outlineApproximate?: boolean;
   pixels: number;
   area: number | null;
   mean: number;
@@ -91,6 +100,8 @@ export interface DefectRegion {
   touchesBoundary: boolean;
 }
 export interface DefectCandidates {
+  labelMap: string;
+  manuallyEdited: boolean;
   threshold: number;
   thresholdSource: 'user' | 'robust';
   count: number;

@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import sharp from 'sharp';
+import ExcelJS from 'exceljs';
 import { AppModule } from '../src/app.module.js';
 import { dicomFixture } from './fixtures.js';
 
@@ -58,6 +59,69 @@ describe('Analysis HTTP API', () => {
     expect(res.body.measurements[0].mean).toBe(-24);
     expect(res.body.preview).toMatch(/^data:image\/png;base64,/);
     expect(res.body.metadata).not.toHaveProperty('PatientName');
+  });
+  it('previews editable candidates and applies validated edits to JSON and Excel', async () => {
+    const pixels = Buffer.alloc(64, 100);
+    for (const i of [27, 28, 35, 36]) pixels[i] = 0;
+    const image = await sharp(pixels, {
+      raw: { width: 8, height: 8, channels: 1 },
+    })
+      .png()
+      .toBuffer();
+    const preview = await upload('/api/defects/preview')
+      .attach('file', image, 'void.png')
+      .expect(201);
+    expect(preview.headers['cache-control']).toBe('no-store');
+    expect(preview.body).not.toHaveProperty('measurements');
+    expect(preview.body.defects.count).toBe(1);
+    expect(preview.body.defects.regions[0].id).toBe(1);
+    expect(preview.body.defects.labelMap).toMatch(/^data:image\/png;base64,/);
+    const edits = JSON.stringify([{ id: 1, points: null }]);
+    const result = await upload()
+      .field('defectEdits', edits)
+      .attach('file', image, 'void.png')
+      .expect(201);
+    expect(result.body.defects).toMatchObject({
+      manuallyEdited: true,
+      count: 0,
+      pixels: 0,
+    });
+    const original = await upload()
+      .attach('file', image, 'void.png')
+      .expect(201);
+    expect(result.body.measurements).toEqual(original.body.measurements);
+    expect(result.body.technicalNotes.join(' ')).toContain(
+      'kullanıcı tarafından',
+    );
+    const exported = await upload('/api/export')
+      .buffer(true)
+      .parse((response, callback) => {
+        const chunks: Buffer[] = [];
+        response.on('data', (chunk: Buffer) => chunks.push(chunk));
+        response.on('end', () => callback(null, Buffer.concat(chunks)));
+      })
+      .field('defectEdits', edits)
+      .attach('file', image, 'void.png')
+      .expect(201);
+    expect(exported.headers['content-type']).toContain('spreadsheetml');
+    const book = new ExcelJS.Workbook();
+    await book.xlsx.load(exported.body);
+    const notes: string[] = [];
+    book.worksheets[0]!.eachRow((row) => notes.push(row.getCell(2).text));
+    expect(notes.join(' ')).toContain('kullanıcı tarafından');
+
+    for (const invalid of [
+      '{',
+      '[{"id":0,"points":null}]',
+      '[{"id":1,"points":null},{"id":1,"points":null}]',
+      '[{"id":1,"points":[[1,1],[2,2]]}]',
+      '[{"id":1,"points":[[1,1],[20,1],[1,3]]}]',
+    ]) {
+      await upload()
+        .field('defectEdits', invalid)
+        .attach('file', image, 'void.png')
+        .expect(400);
+    }
   });
   it('returns grayscale results for PNG', async () => {
     const image = await sharp(Buffer.alloc(64, 100), {

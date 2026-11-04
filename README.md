@@ -112,6 +112,16 @@ Bu akış kesit bazında karşılaştırma sağlar; kesitleri birleştirerek 3B 
 4. Aday sayısını, alan oranını ve uzamış adayları raporlayın. Kapsayan kutunun ölçülerini gerçek yarık genişliği/uzunluğu olarak kullanmayın.
 5. Malzeme uygunluğu veya kesin yarık kararı için bağımsız referansla değerlendirin. Eşik, alan ve kaynak görüntüyü raporla birlikte koruyun.
 
+### 4. Hesaplamadan önce boşluk sınırlarını düzeltme
+
+1. Ölçüm ayarları aşamasında **Boşluk ön analizi** düğmesine basın. Bu işlem adayları hazırlar; ön analiz tek başına rapor aşamasını açmaz.
+2. Görüntüdeki **×** simgesiyle yanlış adayı kaldırın. Bir boşluğu seçip beyaz sınır noktalarını sürükleyerek şeklini her yönde değiştirin.
+3. Seçili boşluğun kenarına tıklayarak yeni nokta ekleyin ve sürükleyin. Sınır standart bir şekle bağlı değildir; içbükey çokgenler desteklenir. Nokta odaktayken **Delete/Backspace** noktayı siler. En az 3, en fazla 512 nokta kullanılabilir.
+4. **Escape** devam eden hareketi iptal eder; **Geri al** son düzenlemeyi, **Düzeltmeleri sıfırla** tüm düzenlemeleri geri alır. Kendi üzerinden geçen veya alanı sıfır olan sınırlar kabul edilmez.
+5. **Ölçümü hesapla** ile düzeltmeleri onaylayın. Aday sayısı, alanı, oranı ve aday ortalamaları düzenlenen maskeden yeniden hesaplanır; Excel'deki işaretli görüntü ve aday bilgileri de güncellenir. Genel numune yoğunluğu istatistikleri aynı ölçüm alanından hesaplanmaya devam eder.
+
+Düzeltmeler dosyaya özeldir ve yalnızca açık sekmede tutulur. Ölçüm alanı dışındaki pikseller aday hesabına alınmaz; çakışan alanlar bir kez sayılır. Düzenlenmeyen adayların özgün piksel maskesi korunur. En büyük 50 aday düzenlenebilir; diğer adaylar toplam ölçümde korunur. Ölçüm alanı, eşik veya kalibrasyon değişirse eski düzeltmeler sıfırlanır; ön analizi yeniden çalıştırın. **Ön analizi yenile (sıfırla)** da mevcut düzeltmeleri temizler.
+
 ### Ölçümün hesaplanma akışı
 
 ```mermaid
@@ -175,6 +185,7 @@ Girdi sınırları: dosya başına 20 MB, varsayılan 16.777.216 piksel (4096 ×
 ## API
 
 - `POST /api/preview`: `multipart/form-data`, `file` alanı. Ölçüm alanı seçmeden PNG önizlemesi, boyut ve birim bilgisi döndürür. Otomatik çember bulunamayan DICOM dosyaları da önizlenebilir.
+- `POST /api/defects/preview`: Aynı dosya ve ölçüm ayarlarıyla düzenlenebilir boşluk ön analizi döndürür; önizleme, ROI ve aday maskesi içerir, nihai ölçüm tablosu içermez.
 - `POST /api/analyze`: `multipart/form-data`, `file` alanı ve isteğe bağlı ölçüm ayarları. JSON sonuç döndürür.
 - `POST /api/export`: Aynı dosya ve ayarları alır; XLSX raporu döndürür.
 - `GET /health`: `{ "status": "ok" }`.
@@ -183,6 +194,7 @@ Girdi sınırları: dosya başına 20 MB, varsayılan 16.777.216 piksel (4096 ×
 
 | Alanlar | Açıklama |
 | --- | --- |
+| `defectEdits` | JSON `[{"id":1,"points":null}]` adayı siler; `points:[[x,y],...]` sınırı değiştirir. Kimlikler ön analizdeki adaylara aittir; en fazla 50 düzenleme, çokgen başına 3–512 nokta. |
 | `roiShape` | `circle` (varsayılan), `rectangle`, `polygon` |
 | `roiPoints` | JSON `[x,y]` dizisi; dikdörtgen için iki karşı köşe, çokgen için 3–128 köşe |
 | `materialReference` | `marble-excel` veya `none`; hesaplanan HU değiştirilmez |

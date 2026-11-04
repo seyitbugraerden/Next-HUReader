@@ -66,8 +66,8 @@ function simplify(points: Point[], tolerance: number): Point[] {
   return points.filter((_, i) => keep[i]);
 }
 
-function contour(
-  labels: Uint16Array,
+export function contour(
+  labels: Uint16Array | Uint32Array,
   id: number,
   w: number,
   h: number,

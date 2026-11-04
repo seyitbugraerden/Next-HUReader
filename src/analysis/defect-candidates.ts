@@ -1,4 +1,7 @@
-import type { DefectRegion, ImageData } from './analysis.types.js';
+import { BadRequestException } from '@nestjs/common';
+import { polygonMembership, validatePolygon } from './roi-geometry.js';
+import { contour } from './sample-segmentation.js';
+import type { DefectEdit, DefectRegion, ImageData } from './analysis.types.js';
 
 // Exploratory segmentation, not a calibrated fracture/porosity classifier.
 // A robust lower-tail threshold adapts to each selected material region.
@@ -7,6 +10,7 @@ export function findDefectCandidates(
   roi: Uint8Array,
   sorted: number[],
   suppliedThreshold?: number,
+  edits: DefectEdit[] = [],
 ) {
   const middle = (a: number[]) =>
     a.length % 2
@@ -18,9 +22,76 @@ export function findDefectCandidates(
     .sort((a, b) => a - b);
   const threshold =
     suppliedThreshold ?? median - Math.max(1, 3 * 1.4826 * middle(deviations));
+  const automatic = measureCandidates(image, roi, sorted.length, threshold);
+  if (!edits.length) {
+    const result = automatic;
+    return {
+      ...result,
+      thresholdSource:
+        suppliedThreshold === undefined
+          ? ('robust' as const)
+          : ('user' as const),
+      manuallyEdited: false,
+    };
+  }
+  const mask = automatic.mask.slice();
+  const editedIds = new Set(edits.map((edit) => edit.id));
+  for (const edit of edits) {
+    if (edit.id > automatic.count)
+      throw new BadRequestException(
+        'Boşluk adayı değişti; ön analizi yeniden çalıştırın.',
+      );
+    if (edit.points)
+      validatePolygon(edit.points, image.width, image.height, 512);
+  }
+  // Clear all replaced originals first; overlapping edits must be order-independent.
+  for (let i = 0; i < mask.length; i++)
+    if (editedIds.has(automatic.labels[i]!)) mask[i] = 0;
+  for (const edit of edits) {
+    if (!edit.points) continue;
+    const minX = Math.max(
+      0,
+      Math.floor(Math.min(...edit.points.map((p) => p[0]))),
+    );
+    const maxX = Math.min(
+      image.width - 1,
+      Math.ceil(Math.max(...edit.points.map((p) => p[0]))),
+    );
+    const minY = Math.max(
+      0,
+      Math.floor(Math.min(...edit.points.map((p) => p[1]))),
+    );
+    const maxY = Math.min(
+      image.height - 1,
+      Math.ceil(Math.max(...edit.points.map((p) => p[1]))),
+    );
+    for (let y = minY; y <= maxY; y++)
+      for (let x = minX; x <= maxX; x++) {
+        const index = y * image.width + x;
+        if (roi[index] && polygonMembership(edit.points, x, y, 0).full)
+          mask[index] = 1;
+      }
+  }
+  const result = measureCandidates(image, roi, sorted.length, threshold, mask);
+  return {
+    ...result,
+    thresholdSource:
+      suppliedThreshold === undefined ? ('robust' as const) : ('user' as const),
+    manuallyEdited: true,
+  };
+}
+
+function measureCandidates(
+  image: ImageData,
+  roi: Uint8Array,
+  sampleCount: number,
+  threshold: number,
+  suppliedMask?: Uint8Array,
+) {
   const { width, height, values, spacing } = image;
   const state = new Uint8Array(roi.length);
   const mask = new Uint8Array(roi.length);
+  const labels = new Uint32Array(roi.length);
   const queue = new Int32Array(roi.length);
   let total = 0,
     pixels = 0,
@@ -28,7 +99,8 @@ export function findDefectCandidates(
     boundaryCount = 0;
   const regions: DefectRegion[] = [];
   for (let i = 0; i < roi.length; i++)
-    if (roi[i] && values[i]! <= threshold) state[i] = 1;
+    if (roi[i] && (suppliedMask ? suppliedMask[i] : values[i]! <= threshold))
+      state[i] = 1;
   for (let start = 0; start < state.length; start++) {
     if (state[start] !== 1) continue;
     let head = 0,
@@ -98,8 +170,13 @@ export function findDefectCandidates(
     pixels += tail;
     if (elongated) elongatedCount++;
     if (touchesBoundary) boundaryCount++;
-    for (let i = 0; i < tail; i++) mask[queue[i]!] = 1;
+    for (let i = 0; i < tail; i++) {
+      mask[queue[i]!] = 1;
+      labels[queue[i]!] = total;
+    }
     regions.push({
+      id: total,
+      outline: [],
       pixels: tail,
       area: spacing ? tail * spacing[0] * spacing[1] : null,
       mean: sum / tail,
@@ -113,16 +190,33 @@ export function findDefectCandidates(
     regions.sort((a, b) => b.pixels - a.pixels);
     if (regions.length > 50) regions.length = 50;
   }
+  for (const region of regions) {
+    const b = region.bounds;
+    const traced = contour(labels, region.id, width, height, [
+      b.x,
+      b.y,
+      b.x + b.width - 1,
+      b.y + b.height - 1,
+    ]);
+    region.outline = (
+      traced ?? [
+        [b.x - 0.5, b.y - 0.5],
+        [b.x + b.width - 0.5, b.y - 0.5],
+        [b.x + b.width - 0.5, b.y + b.height - 0.5],
+        [b.x - 0.5, b.y + b.height - 0.5],
+      ]
+    ).map(([x, y]) => [Math.max(0, x), Math.max(0, y)] as [number, number]);
+    region.outlineApproximate = !traced;
+  }
   return {
     mask,
+    labels,
     threshold,
-    thresholdSource:
-      suppliedThreshold === undefined ? ('robust' as const) : ('user' as const),
     count: total,
     elongatedCount,
     boundaryCount,
     pixels,
-    percent: (100 * pixels) / sorted.length,
+    percent: (100 * pixels) / sampleCount,
     area: spacing ? pixels * spacing[0] * spacing[1] : null,
     regions,
     truncated: total > regions.length,
