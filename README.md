@@ -2,9 +2,45 @@
 
 NestJS + TypeScript ile CT kesiti / numune görseli analiz uygulaması. Türkçe web arayüzü, dosya yükleme, dairesel ölçüm alanı, sayısal ölçümler, histogram ve Excel raporu içerir.
 
+## İçindekiler
+
+- [Ekran görüntüleri](#ekran-görüntüleri)
+- [Çalıştırma](#çalıştırma)
+- [Kullanım](#kullanım)
+- [Kullanım metodolojileri](#kullanım-metodolojileri)
+- [Alan seçimi ve sayısal değerlendirme](#alan-seçimi-ve-sayısal-değerlendirme)
+- [Materyal referansı ve yarık adayları](#materyal-referansı-ve-yarık-adayları)
+- [Ölçümler](#ölçümler)
+- [Giriş biçimleri ve ölçüm birimleri](#giriş-biçimleri-ve-ölçüm-birimleri)
+- [API](#api)
+- [Doğrulama](#doğrulama)
+- [Proje yapısı](#yapı)
+
+## Ekran görüntüleri
+
+Aşağıdaki görüntüler uygulamanın gerçek arayüzünden, sentetik bir PNG numune ile alınmıştır. Görünen değerler kullanım örneğidir; gerçek DICOM ölçümü veya kalibrasyon referansı değildir.
+
+### 1. Görüntü yükleme
+
+Tek dosya, çoklu dosya veya klasör seçerek analiz kuyruğu oluşturun.
+
+![HUReader görüntü yükleme ekranı ve sentetik numune önizlemesi](docs/images/01-goruntu-yukleme.png)
+
+### 2. Ölçüm alanını kontrol etme
+
+Numune sınırını ve kenar payı uygulanmış iç ölçüm alanını görüntü üzerinde doğrulayın.
+
+![HUReader ölçüm alanı ve hesaplama ayarları](docs/images/02-olcum-alani.png)
+
+### 3. Sonuçlar ve Excel raporu
+
+Sayısal ölçümleri, histogramı ve düşük yoğunluk adaylarını inceleyip raporu indirin.
+
+![HUReader sonuç tablosu, histogram ve rapor indirme ekranı](docs/images/03-sonuclar-rapor.png)
+
 ## Çalıştırma
 
-Node.js 24.15+ veya 26+ ve npm gerekir.
+Projenin `package.json` dosyasındaki sürüm koşuluna uygun **Node.js 24.x** ve npm gerekir.
 
 ```bash
 npm ci
@@ -36,6 +72,61 @@ Klasör seçiminde PNG/JPG, `.dcm`/`.dicom`/`.ima` dosyaları ve başlığında 
 Klasör seçimi tarayıcının kullanıcı tarafından seçilen dosyalarına dayanır; sunucuya mutlak bir disk yolu verilmez. Seçim anlık bir taramadır, klasör izleme hizmeti değildir. Yeni dosyalar eklenince klasörü tekrar seçin. Klasör seçimini desteklemeyen tarayıcılarda çoklu dosya seçimi kullanılabilir. Tarayıcı özelliği: [MDN — webkitdirectory](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/webkitdirectory).
 
 Sekmeler sol/sağ ok, Home ve End tuşlarıyla kullanılabilir. Önizlemedeki tam ekran düğmesiyle kesiti büyütebilir, **Kullanım rehberi** düğmesiyle kısa açıklamaları açabilirsiniz. Ölçüm notları sonuçlar bölümünde açılıp kapatılabilir. Arayüz masaüstü ve mobil ekranlara uyarlanır.
+
+## Kullanım metodolojileri
+
+### Yöntem seçimi
+
+| Amaç | Önerilen girdi ve yöntem | Sonucun yorumu |
+| --- | --- | --- |
+| Bir kesitte nicel CT analizi | Özgün, desteklenen DICOM; otomatik alanı kontrol ederek ölçüm | DICOM dönüşümünden hesaplanan HU; PixelSpacing varsa mm² |
+| Düzensiz numuneyi ölçme | Otomatik sınırı inceleyin; gerekirse dikdörtgen veya serbest çokgen çizin | Seçilen iç alanın istatistikleri; dairesel merkez bölgeleri uygulanmaz |
+| Ekran görüntüsünü ön değerlendirme | PNG/JPG; biliniyorsa piksel boyutu ve pencere sınırlarını girin | Kalibrasyonsuz 0–255 gri ton, pencere dönüşümüyle yaklaşık HU |
+| Birden fazla kesiti karşılaştırma | Çoklu dosya veya klasör; her dosyanın alanını doğrulayın, toplu analiz yapın | Aynı birim ve benzer çekim/alan koşullarındaki sonuçları karşılaştırın |
+| Koyu veya ince bölgeleri araştırma | Doğrulanmış iç alan; otomatik ya da kullanıcı tanımlı düşük yoğunluk eşiği | İncelenecek aday bölgeler; kesin yarık veya porozite kararı değildir |
+
+### 1. Tek kesitte tekrarlanabilir ölçüm
+
+1. Mümkünse işaretlenmemiş özgün DICOM dosyasını yükleyin. PNG/JPG kullanıyorsanız birimin gri ton veya yaklaşık HU olacağını dikkate alın.
+2. **Ölçüm ayarlarına geç** ile kesiti açın ve **Ölçümü hesapla** düğmesine basın. Otomatik sınırı görüntü üzerinde kontrol edin.
+3. Sınır numuneyi doğru kapsamıyorsa alanı elle çizin. Daire, dikdörtgen veya serbest seçimde arka planı ve ilgisiz parçaları dışarıda bırakın.
+4. Kenar payını kontrol edin. Karşılaştırmalı çalışmalarda aynı fiziksel kenar payını kullanın; piksel boyutu bilinmiyorsa piksel cinsinden ayarı kaydedin.
+5. Alanı veya ayarları değiştirdiğinizde yeniden hesaplayın. **Sonuçlara geç** ile ortalama, standart sapma, yüzdelikler ve bölgesel farkları değerlendirin.
+6. **Excel raporunu indir** ile ölçümleri ve işaretli görüntüyü birlikte saklayın. Kaynak dosyayı da ayrı koruyun; uygulama geçmiş tutmaz.
+
+### 2. Klasör ve çoklu kesit karşılaştırması
+
+1. **Klasör seç** veya çoklu dosya seçimiyle kesitleri ekleyin; göreli yolları ve dosya sırasını kontrol edin.
+2. Her dosyayı açarak alanını doğrulayın. Bir dosyanın ayarı diğerlerine otomatik aktarılmaz.
+3. **Tüm dosyaları analiz et** ile güncel sonucu olmayan dosyaları işleyin. Hatalı dosyaları düzeltip yeniden deneyin.
+4. Sonuç tablosunda önce birimleri kontrol edin. HU, yaklaşık HU ve gri ton değerlerini aynı ölçüm serisi gibi yorumlamayın. Çekim koşulları, numune ve alan seçiminin de karşılaştırılabilir olması gerekir.
+5. **Toplu Excel indir** ile güncel başarılı sonuçları dışa aktarın; eksik, hatalı veya eski sonuçlar için **İşlem Durumu** sayfasını inceleyin.
+
+Bu akış kesit bazında karşılaştırma sağlar; kesitleri birleştirerek 3B hacim veya hacimsel porozite hesaplamaz. Sayfayı yenilemeden önce raporu indirin.
+
+### 3. Düşük yoğunluk ve yarık adaylarını inceleme
+
+1. Önce ölçüm alanını doğrulayın; sınırın dışındaki pikseller aday taramasına katılmaz.
+2. İlk incelemede otomatik eşiği kullanın. Malzemeye özgü doğrulanmış bir eşik varsa **Gelişmiş ayarlar** üzerinden girin; eşik sonuçla aynı birimdedir.
+3. Pembe aday katmanını özgün önizlemeyle karşılaştırın. Alan sınırına değen bölgeleri, küçük bölgeleri ve olası artefaktları ayrıca inceleyin.
+4. Aday sayısını, alan oranını ve uzamış adayları raporlayın. Kapsayan kutunun ölçülerini gerçek yarık genişliği/uzunluğu olarak kullanmayın.
+5. Malzeme uygunluğu veya kesin yarık kararı için bağımsız referansla değerlendirin. Eşik, alan ve kaynak görüntüyü raporla birlikte koruyun.
+
+### Ölçümün hesaplanma akışı
+
+```mermaid
+flowchart TD
+    A[Dosya veya klasör seçimi] --> B[Dosya başına önizleme ve biçim kontrolü]
+    B --> C{Girdi türü}
+    C -->|DICOM| D[Ham piksel → slope/intercept → HU]
+    C -->|PNG/JPG| E[Gri ton veya pencereyle yaklaşık HU]
+    D --> F[Otomatik veya elle ölçüm alanı seçimi]
+    E --> F
+    F --> G[Kenar payı ve geçerli piksel maskesi]
+    G --> H[İstatistikler, histogram ve düşük yoğunluk adayları]
+    H --> I[Görüntü üzerinde alan ve sonuç kontrolü]
+    I --> J[Tekil veya toplu Excel raporu]
+```
 
 ## Alan seçimi ve sayısal değerlendirme
 
