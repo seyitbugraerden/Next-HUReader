@@ -14,6 +14,17 @@ let previewRevision = 0;
 let currentPreviewUrl = null;
 let busy = false;
 let currentStep = 1;
+let workflowRouter;
+const workflowRoutes = [
+  { path: '/upload', step: 1 },
+  { path: '/analyze', step: 2, canEnter: () => entries.length > 0 },
+  {
+    path: '/report',
+    step: 3,
+    canEnter: () => readyEntries().length > 0,
+    redirect: '/analyze',
+  },
+];
 let resultDirty = true;
 let entries = [];
 let activeId = null;
@@ -292,9 +303,6 @@ function removeEntry(id) {
         null,
       false,
     );
-  if (currentStep === 3 && !readyEntries().length)
-    currentStep = entries.length ? 2 : 1;
-  if (!entries.length) currentStep = 1;
   syncWorkflow();
 }
 function clearEntries() {
@@ -305,7 +313,6 @@ function clearEntries() {
       URL.revokeObjectURL(entry.thumbnailUrl);
   }
   entries = [];
-  currentStep = 1;
   $('#batch-progress').hidden = true;
   $('#import-summary').hidden = true;
   $('#import-summary').textContent = '';
@@ -342,6 +349,7 @@ function showError(message) {
 }
 function syncWorkflow() {
   saveCurrent();
+  if (workflowRouter) currentStep = workflowRouter.reconcile().step;
   defectEditor.sync();
   $('#draw-area').hidden = currentStep !== 2 || !activeEntry()?.needsArea;
   $('#draw-area').disabled = busy || importing;
@@ -382,21 +390,17 @@ function syncWorkflow() {
   renderQueue();
 }
 function setWorkflow(step, focus = false) {
-  if (
-    busy ||
-    importing ||
-    (step === 2 && !entries.length) ||
-    (step === 3 && !readyEntries().length)
-  )
-    return;
-  if (step === 3 && (!result || resultDirty)) selectEntry(readyEntries()[0].id);
+  const route = workflowRoutes.find((route) => route.step === step);
+  if (route) workflowRouter.navigate(route.path, { focus });
+}
+function renderWorkflow(route, { focus = false } = {}) {
+  const step = route.step;
   currentStep = step;
+  if (step === 3 && (!result || resultDirty)) selectEntry(readyEntries()[0].id);
   syncWorkflow();
   if (step === 3) requestAnimationFrame(drawHistogram);
   if (focus) {
-    $(`#panel-${['upload', 'analyze', 'report'][step - 1]}`).focus({
-      preventScroll: true,
-    });
+    $(`#panel-${route.path.slice(1)}`).focus({ preventScroll: true });
     if ($('.wizard-navigation').getBoundingClientRect().top < 0)
       $('.wizard-navigation').scrollIntoView({ block: 'start' });
   }
@@ -1685,4 +1689,11 @@ $('#export-batch').addEventListener('click', async () => {
     $('#export-batch').textContent = '↓ Toplu Excel indir';
   }
 });
+workflowRouter = window.createRouter({
+  routes: workflowRoutes,
+  fallback: '/upload',
+  canNavigate: () => !busy && !importing,
+  onChange: renderWorkflow,
+});
+workflowRouter.start();
 syncWorkflow();

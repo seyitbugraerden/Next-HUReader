@@ -238,3 +238,9 @@ Kullanılan temel paketler: [NestJS](https://docs.nestjs.com/), [sharp](https://
 ### Otomatik alan seçiminin doğrulanması
 
 Genel akış, sentetik farklı şekillerle ve 60 gerçek DICOM ile test edilmiştir. Güncel kapsam, dosya bazındaki sonuçlar ve sınırlamalar [genel doğrulama raporunda](docs/general-analysis-validation-2026-11-02.md) yer alır. Sayısal doğruluk ile alanın doğru numuneyi seçmesi ayrı doğrulamalardır.
+
+### İşlem sayfaları ve route yönetimi
+
+Yükleme, analiz ve rapor sayfaları sırasıyla `#/upload`, `#/analyze`, `#/report` adreslerini kullanır. Ortak `public/router.js` yöneticisi tarayıcının geri/ileri hareketlerini ve doğrudan adres değişikliklerini işler; sunucuda ek route tanımı gerekmez. Yeni bir sayfa için `public/app.js` içindeki `workflowRoutes` listesine `path`, `step`, gerekirse `canEnter` ve `redirect` eklenir; ilgili panel ve gezinme kontrolleri arayüzde tanımlanır.
+
+Route geçişleri dosyaları, ayarları ve sonuçları bellekte korur. Dosyası olmayan analiz adresi yüklemeye, güncel sonucu olmayan rapor adresi analize yönlendirilir. Dosyalar silindiğinde mevcut adres de güncellenir. İşlem veya dosya aktarımı sürerken sayfa geçişi engellenir. Sayfa yenileme ve sekmeyi kapatma kalıcı kayıt sağlamaz; veri yoksa uygun başlangıç sayfası açılır.
