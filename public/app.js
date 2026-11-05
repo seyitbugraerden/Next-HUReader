@@ -116,7 +116,7 @@ function entryStatus(entry) {
 }
 function renderQueue() {
   $('#queue-card').hidden = !entries.length;
-  $('.upload-card').classList.toggle('has-files', !!entries.length);
+  $('.source-picker').classList.toggle('has-files', !!entries.length);
   $('#queue-count').textContent = `${entries.length} dosya`;
   $('#upload-guidance').textContent = entries.length
     ? 'Dosyalar seçildi. Her dosya için ölçüm ayarlarıyla devam edebilirsiniz.'
@@ -125,9 +125,6 @@ function renderQueue() {
   $('#file-type').textContent = `${entries.length} DOSYA`;
   $('#file-size').textContent =
     `${fmt(entries.reduce((total, e) => total + e.file.size, 0) / 1024 / 1024, 2)} MB`;
-  $('#file-label').textContent = entries.length
-    ? `${entries.length} dosya seçildi · Daha fazla ekleyin`
-    : 'Görüntüleri sürükleyip bırakın';
   $('#file-queue').replaceChildren(
     ...entries.map((entry) => {
       const row = document.createElement('article');
@@ -1513,16 +1510,19 @@ function drawHistogram() {
   canvas.height = h * ratio;
   const ctx = canvas.getContext('2d');
   ctx.scale(ratio, ratio);
+  const theme = getComputedStyle(document.documentElement);
+  const chartColor = (name, fallback) =>
+    theme.getPropertyValue(name).trim() || fallback;
   const left = 38,
     right = 12,
     top = 15,
     bottom = 30;
   const max = Math.max(...result.histogram.map((b) => b.count), 1);
   ctx.font = '9px system-ui';
-  ctx.fillStyle = '#7c90a4';
+  ctx.fillStyle = chartColor('--chart-text', '#7c90a4');
   for (let i = 0; i <= 4; i++) {
     const y = top + ((h - top - bottom) * i) / 4;
-    ctx.strokeStyle = '#e8eef4';
+    ctx.strokeStyle = chartColor('--chart-grid', '#e8eef4');
     ctx.beginPath();
     ctx.moveTo(left, y);
     ctx.lineTo(w - right, y);
@@ -1533,10 +1533,10 @@ function drawHistogram() {
   const bw = (w - left - right) / result.histogram.length;
   for (const [i, bin] of result.histogram.entries()) {
     const bh = (bin.count / max) * (h - top - bottom);
-    ctx.fillStyle = '#228c84';
+    ctx.fillStyle = chartColor('--chart-bar', '#228c84');
     ctx.fillRect(left + i * bw, h - bottom - bh, Math.max(0.5, bw - 1), bh);
   }
-  ctx.fillStyle = '#7c90a4';
+  ctx.fillStyle = chartColor('--chart-text', '#7c90a4');
   ctx.textAlign = 'left';
   ctx.fillText(integer(result.histogram[0].lower), left, h - 10);
   ctx.textAlign = 'right';

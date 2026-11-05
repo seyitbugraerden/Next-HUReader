@@ -74,61 +74,63 @@ test('workflow entrance animations respect reduced-motion preferences', async ({
   await expect.poll(animationDuration).toBeLessThanOrEqual(1);
 });
 
-test('workflow steps are stacked vertically on desktop and mobile', async ({
+test('workflow steps stay above the workspace in one row on desktop and mobile', async ({
   page,
 }) => {
   await page.goto('/');
-  const workflowColumns = () =>
-    page.locator('.workflow').evaluate((workflow) => {
-      const style = getComputedStyle(workflow);
-      return style.gridTemplateColumns.split(' ').length;
-    });
-
-  await page.setViewportSize({ width: 1440, height: 1000 });
-  await expect.poll(workflowColumns).toBe(1);
-  await expect
-    .poll(() =>
-      page.locator('.wizard-navigation').evaluate((navigation) => {
-        const style = getComputedStyle(navigation);
-        return style.position === 'sticky' && style.gridColumnStart === '1';
-      }),
-    )
-    .toBe(true);
-
-  await page.setViewportSize({ width: 390, height: 844 });
-  await expect.poll(workflowColumns).toBe(1);
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () => document.documentElement.scrollWidth <= window.innerWidth,
+  for (const width of [1440, 768, 390, 320]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await expect
+      .poll(async () =>
+        page.locator('.workflow > button').evaluateAll((buttons) => {
+          const boxes = buttons.map((button) => button.getBoundingClientRect());
+          return boxes.every(
+            (box, i) =>
+              Math.abs(box.top - boxes[0]!.top) < 2 &&
+              (i === 0 || box.left > boxes[i - 1]!.right - 2),
+          );
+        }),
+      )
+      .toBe(true);
+    const nav = await page.locator('.wizard-navigation').boundingBox();
+    const workspace = await page.locator('#workspace').boundingBox();
+    expect(nav).not.toBeNull();
+    expect(workspace).not.toBeNull();
+    expect(workspace!.y).toBeGreaterThanOrEqual(nav!.y + nav!.height);
+    expect(Math.abs(nav!.width - workspace!.width)).toBeLessThan(2);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
       ),
-    )
-    .toBe(true);
+    ).toBe(true);
+  }
 });
 
-test('image source and guidance occupy separate rows', async ({ page }) => {
+test('source selection starts with only two unboxed actions and opens the file picker', async ({
+  page,
+}) => {
   await page.goto('/');
-  for (const width of [1440, 390]) {
+  await expect(page.locator('.upload-card, .upload-guide')).toHaveCount(0);
+  await expect(page.locator('#queue-card')).toBeHidden();
+  await expect(page.locator('#go-analyze')).toBeHidden();
+  for (const width of [1440, 390, 320]) {
     await page.setViewportSize({ width, height: 1000 });
-    const layout = await page.locator('#panel-upload .upload-layout').evaluate(
-      (container) => {
-        const source = container.querySelector('.upload-card')!.getBoundingClientRect();
-        const guide = container.querySelector('.upload-guide')!.getBoundingClientRect();
-        return {
-          sourceBottom: source.bottom,
-          guideTop: guide.top,
-          sourceWidth: source.width,
-          guideWidth: guide.width,
-          contentWidth: document.documentElement.scrollWidth,
-          viewportWidth: window.innerWidth,
-        };
-      },
-    );
-
-    expect(layout.guideTop).toBeGreaterThanOrEqual(layout.sourceBottom);
-    expect(layout.guideWidth).toBeGreaterThan(layout.sourceWidth * 0.9);
-    expect(layout.contentWidth).toBeLessThanOrEqual(layout.viewportWidth);
+    await expect(page.locator('#choose-file')).toBeVisible();
+    await expect(page.locator('#choose-folder')).toBeVisible();
+    const file = await page.locator('#choose-file').boundingBox();
+    const folder = await page.locator('#choose-folder').boundingBox();
+    expect(Math.abs(file!.y - folder!.y)).toBeLessThan(2);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
   }
+  const chooserPromise = page.waitForEvent('filechooser');
+  await page.locator('#choose-file').click();
+  const chooser = await chooserPromise;
+  expect(chooser.isMultiple()).toBe(true);
+  await chooser.setFiles([]);
 });
 
 test('all uploaded images can be cancelled and workflow resets to upload', async ({
@@ -168,9 +170,7 @@ test('all uploaded images can be cancelled and workflow resets to upload', async
   await expect
     .poll(() => page.locator('#empty').evaluate((empty) => empty.hidden))
     .toBe(false);
-  await expect(page.locator('#file-label')).toHaveText(
-    'Görüntüleri sürükleyip bırakın',
-  );
+  await expect(page.locator('#file-label')).toHaveText('Dosya seç');
 });
 
 test('uploaded images show previews and can be removed from their preview card', async ({
@@ -180,42 +180,50 @@ test('uploaded images show previews and can be removed from their preview card',
   await page.setViewportSize({ width: 1440, height: 844 });
   await page.locator('#file').setInputFiles([
     { name: 'first-slice.png', mimeType: 'image/png', buffer: await disk(80) },
-    { name: 'second-slice.png', mimeType: 'image/png', buffer: await disk(180) },
+    {
+      name: 'second-slice.png',
+      mimeType: 'image/png',
+      buffer: await disk(180),
+    },
   ]);
   await settled(page);
 
   const cards = page.locator('.queue-preview-card');
   await expect(cards).toHaveCount(2);
   await expect(page.locator('#queue-card')).toBeVisible();
-  await expect(page.locator('.upload-card #queue-card')).toBeVisible();
-  await expect(page.locator('.upload-card #go-analyze')).toBeVisible();
+  await expect(page.locator('.source-picker #queue-card')).toBeVisible();
+  await expect(page.locator('.source-picker #go-analyze')).toBeVisible();
   await expect
     .poll(() =>
-      page.locator('.upload-card .dropzone').evaluate(
-        (dropzone) => dropzone.getBoundingClientRect().height,
-      ),
-    )
-    .toBeLessThan(180);
-  await expect
-    .poll(() =>
-      page.locator('#go-analyze').evaluate(
-        (button) =>
-          button.getBoundingClientRect().bottom <= window.innerHeight,
-      ),
+      page
+        .locator('#go-analyze')
+        .evaluate(
+          (button) =>
+            button.getBoundingClientRect().bottom <= window.innerHeight,
+        ),
     )
     .toBe(true);
   await expect(cards.nth(0).locator('.queue-name')).toHaveText(
     'first-slice.png',
   );
-  await expect(cards.nth(0).locator('.queue-name')).not.toHaveClass(/badge|file-type/);
+  await expect(cards.nth(0).locator('.queue-name')).not.toHaveClass(
+    /badge|file-type/,
+  );
   await expect
     .poll(() =>
-      cards.nth(0).locator('.queue-preview-image').evaluate(
-        (image: HTMLImageElement) => image.complete && image.naturalWidth > 0,
-      ),
+      cards
+        .nth(0)
+        .locator('.queue-preview-image')
+        .evaluate(
+          (image: HTMLImageElement) => image.complete && image.naturalWidth > 0,
+        ),
     )
     .toBe(true);
-  await expect(cards.nth(0).getByRole('button', { name: 'first-slice.png dosyasını kaldır' })).toBeVisible();
+  await expect(
+    cards
+      .nth(0)
+      .getByRole('button', { name: 'first-slice.png dosyasını kaldır' }),
+  ).toBeVisible();
   await cards
     .nth(0)
     .getByRole('button', { name: 'first-slice.png dosyasını kaldır' })
@@ -324,7 +332,9 @@ test('per-file geometry, calibration, stale results and both Excel reports remai
   await expect(page.locator('#export')).toBeEnabled();
   const singleDownload = page.waitForEvent('download');
   await expect(page.locator('#export')).toBeVisible();
-  await expect(page.locator('#export')).toHaveText('↓ Seçili dosyayı Excel indir');
+  await expect(page.locator('#export')).toHaveText(
+    '↓ Seçili dosyayı Excel indir',
+  );
   await page.locator('#export').click();
   const singlePath = info.outputPath('single.xlsx');
   await (await singleDownload).saveAs(singlePath);
@@ -392,9 +402,11 @@ test('extensionless DICOM can be previewed before a successful analysis', async 
   await expect(page.locator('.queue-preview-image')).toHaveCount(1);
   await expect
     .poll(() =>
-      page.locator('.queue-preview-image').evaluate(
-        (image: HTMLImageElement) => image.complete && image.naturalWidth > 0,
-      ),
+      page
+        .locator('.queue-preview-image')
+        .evaluate(
+          (image: HTMLImageElement) => image.complete && image.naturalWidth > 0,
+        ),
     )
     .toBe(true);
   await page.locator('#go-analyze').click();
@@ -744,7 +756,9 @@ test('uncertain images request a visual boundary and recover without technical i
   );
   await expect(page.locator('#batch-counts')).not.toContainText('1 hata');
   await page.locator('#draw-area').click();
-  await expect(page.locator('input[name=roiShape][value=polygon]')).toBeChecked();
+  await expect(
+    page.locator('input[name=roiShape][value=polygon]'),
+  ).toBeChecked();
   await expect(page.locator('#advanced-settings')).not.toHaveAttribute('open');
   for (const [x, y] of [
     [10, 10],

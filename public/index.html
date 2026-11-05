@@ -10,6 +10,7 @@
     />
     <link rel="icon" href="data:," />
     <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/studio-theme.css" />
     <script src="/vendor/exceljs.min.js" defer></script>
     <script src="/batch-export.js" defer></script>
     <script src="/preview-viewport.js" defer></script>
@@ -164,231 +165,92 @@
               </div>
               <span class="badge">GÖRÜNTÜ KAYNAĞI</span>
             </div>
-            <div class="upload-layout">
-              <div>
-                <section class="card upload-card">
-                  <div class="section-title">
-                    <span class="number">01</span>
-                    <h2>Görüntü kaynağı</h2>
-                  </div>
-                  <label class="dropzone" id="dropzone" for="file"
-                    ><span class="upload-symbol"
-                      ><svg class="icon"><use href="#i-upload" /></svg></span
-                    ><strong id="file-label"
-                      >Görüntüleri sürükleyip bırakın</strong
-                    ><span>veya bilgisayarınızdan dosya seçin</span
-                    ><small
-                      >DICOM · PNG · JPG
-                      <span class="format-divider">/</span> Dosya başına 20
-                      MB</small
-                    ><input id="file" name="file" type="file" multiple
-                  /></label>
-                  <div class="folder-picker">
-                    <label id="choose-folder" class="secondary" for="folder">
-                      <svg class="icon"><use href="#i-upload" /></svg>Klasör
-                      seç<input
-                        id="folder"
-                        type="file"
-                        webkitdirectory
-                        directory
-                        multiple
-                        aria-label="İncelenecek klasörü seçin" /></label
-                    ><span>Alt klasörler dahil taranır.</span>
-                  </div>
-                  <p id="folder-support" class="quiet" hidden>
-                    Tarayıcınız klasör seçimini desteklemiyor. Dosyaları çoklu
-                    seçimle ekleyebilirsiniz.
-                  </p>
-                  <p class="quiet">
-                    Safari’de klasörü onaylayamıyorsanız dosya seçimini açın,
-                    klasörün içine girin ve ⌘A ile dosyaları seçin. Uzantısız
-                    DICOM dosyaları da eklenebilir.
-                  </p>
-                  <div
-                    id="import-summary"
-                    class="import-summary"
-                    role="status"
-                    aria-live="polite"
-                    hidden
-                  ></div>
-                  <section class="queue-card" id="queue-card" hidden>
-                    <div class="section-title">
-                      <h2>Eklenen görseller</h2>
-                      <span id="queue-count" class="badge"></span>
-                    </div>
-                    <div
-                      id="file-queue"
-                      class="file-queue"
-                      aria-label="Analiz dosyaları"
-                    ></div>
-                  </section>
-                  <div class="file-info" id="file-info" hidden>
-                    <span class="file-type" id="file-type"></span
-                    ><span id="file-size"></span
-                    ><span class="file-ready">Yüklendi</span>
-                    <button
-                      id="clear-files"
-                      class="file-clear"
-                      type="button"
-                      aria-label="Yüklenen tüm görselleri kaldır"
-                    >
-                      <span aria-hidden="true">×</span> Tüm görselleri kaldır
-                    </button>
-                  </div>
-                  <div class="wizard-actions">
-                    <p id="upload-guidance">
-                      Devam etmek için bir görüntü seçin.
-                    </p>
-                    <button
-                      id="go-analyze"
-                      class="primary"
-                      type="button"
-                      disabled
-                    >
-                      <span>Ölçüm ayarlarına geç</span><span>→</span>
-                    </button>
-                  </div>
-                  <p class="quiet privacy-note">
-                    <svg class="icon"><use href="#i-shield" /></svg>Dosyalar
-                    sunucunun belleğinde işlenir; diske kaydedilmez.
-                  </p>
-                </section>
-                <div class="sidebar-note">
-                  <svg class="icon"><use href="#i-help" /></svg>
-                  <p>
-                    <b>Ölçümün kaynağı önemli.</b><br />Özgün DICOM sayısal HU
-                    ölçümü sağlar. PNG/JPG varsayılan olarak gri ton yoğunluğu
-                    verir.
-                  </p>
-                </div>
+            <section
+              class="source-picker"
+              id="dropzone"
+              aria-label="Görüntü kaynağı"
+            >
+              <div class="source-actions">
+                <label
+                  id="choose-file"
+                  class="source-action primary"
+                  for="file"
+                  title="DICOM, PNG veya JPG · Dosya başına en fazla 20 MB"
+                >
+                  <svg class="icon"><use href="#i-upload" /></svg
+                  ><span id="file-label">Dosya seç</span>
+                  <input
+                    id="file"
+                    name="file"
+                    type="file"
+                    multiple
+                    aria-label="Görüntü dosyalarını seçin"
+                  />
+                </label>
+                <label
+                  id="choose-folder"
+                  class="source-action secondary"
+                  for="folder"
+                  title="Alt klasörler dahil ekle"
+                >
+                  <svg class="icon"><use href="#i-upload" /></svg
+                  ><span>Klasör seç</span>
+                  <input
+                    id="folder"
+                    type="file"
+                    webkitdirectory
+                    directory
+                    multiple
+                    aria-label="İncelenecek klasörü seçin"
+                  />
+                </label>
               </div>
-              <div class="upload-guide card">
-                <span class="eyebrow">BAŞLAMADAN ÖNCE</span>
-                <h2>Doğru görüntü, anlamlı ölçüm.</h2>
-                <p>
-                  Bir veya birden fazla kesit yükleyin. Her dosya ayrı ölçülür;
-                  numunenin tamamının görünür olduğundan emin olun.
-                </p>
-                <div class="scan-visual" aria-hidden="true">
-                  <div class="scan-visual-caption">
-                    <span>HU READER <i>/</i> SCAN PREVIEW</span>
-                    <span class="scan-live">READY</span>
-                  </div>
-                  <svg viewBox="0 0 480 190" fill="none">
-                    <defs>
-                      <linearGradient
-                        id="scan-sample"
-                        x1="152"
-                        y1="30"
-                        x2="312"
-                        y2="170"
-                        gradientUnits="userSpaceOnUse"
-                      >
-                        <stop stop-color="#DDF9F1" />
-                        <stop offset=".52" stop-color="#8FCFC3" />
-                        <stop offset="1" stop-color="#478F9C" />
-                      </linearGradient>
-                      <radialGradient id="scan-core">
-                        <stop stop-color="#F7FFF8" />
-                        <stop offset=".72" stop-color="#B8E5D7" />
-                        <stop offset="1" stop-color="#6EB9AE" />
-                      </radialGradient>
-                      <pattern
-                        id="scan-grid"
-                        width="18"
-                        height="18"
-                        patternUnits="userSpaceOnUse"
-                      >
-                        <path
-                          d="M18 0H0V18"
-                          stroke="#718A9B"
-                          stroke-opacity=".16"
-                        />
-                      </pattern>
-                    </defs>
-                    <path d="M0 0H480V190H0z" fill="url(#scan-grid)" />
-                    <circle
-                      cx="238"
-                      cy="96"
-                      r="75"
-                      stroke="#4BBBAA"
-                      stroke-opacity=".38"
-                      stroke-dasharray="3 6"
-                    />
-                    <circle
-                      cx="238"
-                      cy="96"
-                      r="60"
-                      fill="#173249"
-                      stroke="#74D7C2"
-                      stroke-opacity=".7"
-                    />
-                    <path
-                      d="M238 36a60 60 0 0 1 57 41c-14 3-22 13-38 12-15-1-20-10-35-9-17 1-28 15-44 12a60 60 0 0 1 60-56Z"
-                      fill="url(#scan-sample)"
-                    />
-                    <path
-                      d="M178 97c15-3 27-16 44-17 15-1 20 8 35 9 16 1 24-9 38-12a60 60 0 0 1-56 79 60 60 0 0 1-61-59Z"
-                      fill="#78BDAF"
-                      fill-opacity=".72"
-                    />
-                    <path
-                      d="M205 72c8 2 11 8 20 7 11-2 17-11 28-8 9 2 12 10 23 10m-62 45c10-8 21-7 29-2 7 4 15 3 22-2"
-                      stroke="#E8FFF5"
-                      stroke-opacity=".72"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                    />
-                    <circle
-                      cx="238"
-                      cy="96"
-                      r="19"
-                      fill="url(#scan-core)"
-                      fill-opacity=".72"
-                    />
-                    <path
-                      d="M238 22v18m0 112v18m-74-74h18m112 0h18"
-                      stroke="#8DE8D4"
-                      stroke-opacity=".8"
-                      stroke-linecap="round"
-                    />
-                    <path
-                      d="M72 48h43m-43 0v16m336-16h-43m43 0v16M72 144h43m-43 0v-16m336 16h-43m43 0v-16"
-                      stroke="#82B5C9"
-                      stroke-opacity=".62"
-                      stroke-linecap="round"
-                    />
-                    <circle cx="238" cy="96" r="4" fill="#F2FFF8" />
-                  </svg>
-                  <span class="scan-visual-scale"
-                    >SLICE 01 <i></i> SAMPLE REGION DETECTED</span
-                  >
+              <p id="folder-support" class="quiet" hidden>
+                Tarayıcınız klasör seçimini desteklemiyor. Dosyaları çoklu
+                seçimle ekleyebilirsiniz.
+              </p>
+              <div
+                id="import-summary"
+                class="import-summary"
+                role="status"
+                aria-live="polite"
+                hidden
+              ></div>
+              <section class="queue-card" id="queue-card" hidden>
+                <div class="section-title">
+                  <h2>Eklenen görseller</h2>
+                  <span id="queue-count" class="badge"></span>
                 </div>
-                <ul>
-                  <li>
-                    <b>Özgün CT DICOM</b
-                    ><span
-                      >Kalibrasyon bilgileri dosyadan okunur; ölçümler HU
-                      cinsinden hesaplanır.</span
-                    >
-                  </li>
-                  <li>
-                    <b>PNG veya JPG</b
-                    ><span
-                      >Gri ton yoğunluğu ölçülür. Bilinen pencere aralığıyla
-                      yaklaşık HU hesaplanabilir.</span
-                    >
-                  </li>
-                  <li>
-                    <b>Alanı birlikte kontrol edin</b
-                    ><span
-                      >Otomatik çemberi inceleyin; gerekiyorsa merkez, yarıçap
-                      ve kenar payını düzeltin.</span
-                    >
-                  </li>
-                </ul>
+                <div
+                  id="file-queue"
+                  class="file-queue"
+                  aria-label="Analiz dosyaları"
+                ></div>
+              </section>
+              <div class="file-info" id="file-info" hidden>
+                <span class="file-type" id="file-type"></span
+                ><span id="file-size"></span
+                ><span class="file-ready">Yüklendi</span>
+                <button
+                  id="clear-files"
+                  class="file-clear"
+                  type="button"
+                  aria-label="Yüklenen tüm görselleri kaldır"
+                >
+                  <span aria-hidden="true">×</span> Tüm görselleri kaldır
+                </button>
               </div>
-            </div>
+              <div class="wizard-actions">
+                <p id="upload-guidance">Devam etmek için bir görüntü seçin.</p>
+                <button id="go-analyze" class="primary" type="button" disabled>
+                  <span>Ölçüm ayarlarına geç</span><span>→</span>
+                </button>
+              </div>
+              <p class="quiet privacy-note">
+                <svg class="icon"><use href="#i-shield" /></svg>Dosyalar
+                sunucunun belleğinde işlenir; diske kaydedilmez.
+              </p>
+            </section>
           </section>
           <section
             id="panel-analyze"
