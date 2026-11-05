@@ -45,7 +45,12 @@ const entryLabel = (entry) => entry.relativePath || entry.file.name;
 const activeEntry = () => entries.find((entry) => entry.id === activeId);
 const readyEntries = () =>
   entries.filter((entry) => entry.result && !entry.dirty);
+const previewViewport = window.createPreviewViewport({
+  canZoom: () => !selectionDrag && !defectEditor.dragging,
+  redraw: () => drawPreview(),
+});
 const defectEditor = window.createDefectEditor({
+  hasFile: () => !!file,
   getReview: () => activeEntry()?.defectReview,
   isBusy: () => busy || importing,
   onChange: () => dirty(true),
@@ -250,6 +255,7 @@ function selectEntry(id, save = true) {
   }
   previewRevision++;
   previewImage = null;
+  previewViewport.reset();
   candidateOverlay = null;
   $('#image-canvas').hidden = true;
   $('#empty').hidden = false;
@@ -825,6 +831,7 @@ function drawPreview() {
   const canvas = $('#image-canvas');
   canvas.width = previewImage.width;
   canvas.height = previewImage.height;
+  previewViewport.setImage(previewImage);
   const ctx = canvas.getContext('2d');
   const screen = canvas.getBoundingClientRect();
   const scale =
@@ -1203,6 +1210,7 @@ $('#preview-defects').addEventListener('click', async () => {
   }
   body.delete('defectEdits');
   const entry = activeEntry();
+  $('#preview-defects').setAttribute('aria-busy', 'true');
   setBusy(true);
   $('#error').hidden = true;
   $('#status').hidden = false;
@@ -1232,6 +1240,7 @@ $('#preview-defects').addEventListener('click', async () => {
     entry.needsArea = error.code === 'ROI_REQUIRED';
     $('#status').hidden = true;
   } finally {
+    $('#preview-defects').removeAttribute('aria-busy');
     setBusy(false);
   }
 });

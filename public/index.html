@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="/styles.css" />
     <script src="/vendor/exceljs.min.js" defer></script>
     <script src="/batch-export.js" defer></script>
+    <script src="/preview-viewport.js" defer></script>
     <script src="/defect-editor.js" defer></script>
     <script src="/router.js" defer></script>
     <script src="/app.js" defer></script>
@@ -515,58 +516,6 @@
                       ></span
                     ></label
                   >
-                  <section class="defect-review" aria-label="Boşluk ön analizi">
-                    <button
-                      id="preview-defects"
-                      class="secondary"
-                      type="button"
-                    >
-                      Boşluk ön analizi
-                    </button>
-                    <div id="defect-edit-tools" hidden>
-                      <label class="check-row"
-                        ><input
-                          id="edit-defects"
-                          type="checkbox"
-                          data-view-only
-                          checked
-                        />
-                        Boşlukları düzenle</label
-                      >
-                      <p class="quiet">
-                        Boşluğu seçin. Noktaları sürükleyin; kenara tıklayarak
-                        yeni nokta ekleyin. × ile boşluğu kaldırın. Nokta
-                        seçiliyken Delete ile noktayı silin.
-                      </p>
-                      <div class="defect-editor-actions">
-                        <button
-                          id="undo-defect"
-                          class="secondary"
-                          type="button"
-                        >
-                          Geri al
-                        </button>
-                        <button
-                          id="reset-defects"
-                          class="secondary"
-                          type="button"
-                        >
-                          Düzeltmeleri sıfırla
-                        </button>
-                      </div>
-                      <p
-                        class="quiet"
-                        id="defect-edit-status"
-                        role="status"
-                        aria-live="polite"
-                      ></p>
-                      <p class="quiet">
-                        Sınırı görüntünün her yönüne genişletebilirsiniz. Hesaba
-                        yalnızca ölçüm alanındaki pikseller katılır.
-                        Düzeltmelerden sonra “Ölçümü hesapla” ile onaylayın.
-                      </p>
-                    </div>
-                  </section>
                   <input type="hidden" name="roiPoints" disabled />
                   <div id="polygon-tools" class="polygon-tools" hidden>
                     <p id="roi-guidance" class="quiet"></p>
@@ -727,41 +676,130 @@
                       </button>
                     </div>
                   </div>
-                  <div class="viewer" id="viewer">
-                    <div class="empty" id="empty">
-                      <div class="scan-mark">
-                        <svg class="icon"><use href="#i-scan" /></svg>
-                      </div>
-                      <span class="empty-overline">KESİT GÖRÜNTÜLEYİCİ</span>
-                      <h3 id="preview-heading">
-                        Analiz için bir görüntü yükleyin
-                      </h3>
-                      <p id="preview-message">
-                        Dosyanızı yüklediğinizde kesit burada görünür.<br />Numune
-                        sınırını kontrol ederek ölçüme başlayın.
-                      </p>
-                      <div class="supported-formats">
-                        <span>DICOM</span><span>PNG</span><span>JPG</span>
-                      </div>
-                    </div>
-                    <canvas
-                      id="image-canvas"
-                      hidden
-                      aria-label="Numune görüntüsü ve seçilen alan"
-                    ></canvas
-                    ><svg
-                      id="defect-editor-overlay"
-                      aria-label="Boşluk sınırı düzenleyicisi"
-                      hidden
-                    ></svg
-                    ><span class="viewer-corner"
-                      >CT VIEWPORT <span>•</span> ROI</span
+                  <div
+                    class="preview-zoom-tools"
+                    role="group"
+                    aria-label="Numune yakınlaştırma"
+                  >
+                    <button
+                      id="zoom-out"
+                      type="button"
+                      aria-label="Numuneden uzaklaş"
                     >
+                      −
+                    </button>
+                    <output id="zoom-level" aria-live="polite">100%</output>
+                    <button
+                      id="zoom-in"
+                      type="button"
+                      aria-label="Numuneye yakınlaş"
+                    >
+                      +
+                    </button>
+                    <button id="zoom-fit" type="button">
+                      Görüntüye sığdır
+                    </button>
+                    <button id="preview-pan" type="button" aria-pressed="false">
+                      Görüntüyü taşı
+                    </button>
+                    <span
+                      >Touchpad’de iki parmağınızı açıp kapatarak veya + / −
+                      düğmeleriyle yakınlaştırın. Büyüyen görüntüyü taşımak için
+                      “Görüntüyü taşı”yı açın.</span
+                    >
+                  </div>
+                  <div class="preview-interaction">
+                    <div class="preview-analysis-action" hidden>
+                      <button
+                        id="preview-defects"
+                        type="button"
+                        aria-controls="defect-edit-tools"
+                        aria-describedby="preview-analysis-hint"
+                        disabled
+                      >
+                        Analiz et
+                      </button>
+                      <span id="preview-analysis-hint"
+                        >Boşluk adaylarını bul ve düzenle</span
+                      >
+                    </div>
+                    <div class="viewer" id="viewer">
+                      <div class="empty" id="empty">
+                        <div class="scan-mark">
+                          <svg class="icon"><use href="#i-scan" /></svg>
+                        </div>
+                        <span class="empty-overline">KESİT GÖRÜNTÜLEYİCİ</span>
+                        <h3 id="preview-heading">
+                          Analiz için bir görüntü yükleyin
+                        </h3>
+                        <p id="preview-message">
+                          Dosyanızı yüklediğinizde kesit burada görünür.<br />Numune
+                          sınırını kontrol ederek ölçüme başlayın.
+                        </p>
+                        <div class="supported-formats">
+                          <span>DICOM</span><span>PNG</span><span>JPG</span>
+                        </div>
+                      </div>
+                      <div id="preview-surface" hidden>
+                        <canvas
+                          id="image-canvas"
+                          hidden
+                          aria-label="Numune görüntüsü ve seçilen alan"
+                        ></canvas
+                        ><svg
+                          id="defect-editor-overlay"
+                          aria-label="Boşluk sınırı düzenleyicisi"
+                          hidden
+                        ></svg>
+                      </div>
+                      <span class="viewer-corner"
+                        >CT VIEWPORT <span>•</span> ROI</span
+                      >
+                    </div>
                   </div>
                   <div class="viewer-footer">
                     <span><i class="legend green"></i>Analiz edilen alan</span
                     ><span><i class="legend orange"></i>Numune dış sınırı</span
                     ><span id="dimensions">— × — px</span>
+                  </div>
+                  <div id="defect-edit-tools" class="defect-edit-tools" hidden>
+                    <label class="check-row"
+                      ><input
+                        id="edit-defects"
+                        type="checkbox"
+                        data-view-only
+                        checked
+                      />
+                      Boşlukları düzenle</label
+                    >
+                    <p class="quiet">
+                      Boşluğu seçin. Noktaları sürükleyin; kenara tıklayarak
+                      yeni nokta ekleyin. × ile boşluğu kaldırın. Nokta
+                      seçiliyken Delete ile noktayı silin.
+                    </p>
+                    <div class="defect-editor-actions">
+                      <button id="undo-defect" class="secondary" type="button">
+                        Geri al
+                      </button>
+                      <button
+                        id="reset-defects"
+                        class="secondary"
+                        type="button"
+                      >
+                        Düzeltmeleri sıfırla
+                      </button>
+                    </div>
+                    <p
+                      class="quiet"
+                      id="defect-edit-status"
+                      role="status"
+                      aria-live="polite"
+                    ></p>
+                    <p class="quiet">
+                      Sınırı görüntünün her yönüne genişletebilirsiniz. Hesaba
+                      yalnızca ölçüm alanındaki pikseller katılır.
+                      Düzeltmelerden sonra “Ölçümü hesapla” ile onaylayın.
+                    </p>
                   </div>
                   <p
                     id="selection-guide"

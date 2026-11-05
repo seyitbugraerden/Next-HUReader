@@ -29,6 +29,7 @@ test('previews candidates, deletes via x, reshapes freely, and exports only conf
   ]);
   await settled(page);
   await page.locator('#go-analyze').click();
+  await page.locator('#viewer').hover();
   await page.locator('#preview-defects').click();
   await expect(page.locator('#defect-edit-tools')).toBeVisible();
   await expect(page.locator('[data-remove]')).toHaveCount(2);
@@ -124,15 +125,14 @@ test('supports removing and restoring all candidates on a mobile viewport', asyn
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
-  await page
-    .locator('#file')
-    .setInputFiles({
-      name: 'mobile.png',
-      mimeType: 'image/png',
-      buffer: await sample(),
-    });
+  await page.locator('#file').setInputFiles({
+    name: 'mobile.png',
+    mimeType: 'image/png',
+    buffer: await sample(),
+  });
   await settled(page);
   await page.locator('#go-analyze').click();
+  await page.locator('#viewer').hover();
   await page.locator('#preview-defects').click();
   await expect(page.locator('[data-remove]')).toHaveCount(2);
   await page.locator('[data-remove="1"]').click();
@@ -150,4 +150,87 @@ test('supports removing and restoring all candidates on a mobile viewport', asyn
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
+});
+
+test('image activation supports hover, keyboard and a visible pending analysis', async ({
+  page,
+}) => {
+  let requests = 0;
+  page.on('request', (request) => {
+    if (request.url().endsWith('/api/defects/preview')) requests++;
+  });
+  await page.goto('/');
+  const action = page.locator('.preview-analysis-action');
+  const button = page.locator('#preview-defects');
+  await expect(action).toBeHidden();
+  await page
+    .locator('#file')
+    .setInputFiles({
+      name: 'hover.png',
+      mimeType: 'image/png',
+      buffer: await sample(),
+    });
+  await settled(page);
+  await page.locator('#go-analyze').click();
+  await page.locator('#image-title').hover();
+  await expect(action).toHaveCSS('opacity', '0');
+  await page.locator('#viewer').hover();
+  await expect(action).toHaveCSS('opacity', '1');
+  await expect(button).toHaveText('Analiz et');
+  await expect(page.locator('#defect-edit-tools')).toBeHidden();
+  expect(requests).toBe(0);
+  await page.locator('#image-title').hover();
+  await page.locator('#preview-pan').focus();
+  await page.keyboard.press('Tab');
+  await expect(button).toBeFocused();
+  await expect(action).toHaveCSS('opacity', '1');
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route('**/api/defects/preview', async (route) => {
+    await gate;
+    await route.continue();
+  });
+  try {
+    await page.keyboard.press('Enter');
+    await expect(button).toHaveText('Analiz ediliyor…');
+    await expect(button).toBeDisabled();
+    await page.locator('#image-title').hover();
+    await expect(action).toHaveCSS('opacity', '1');
+  } finally {
+    release();
+  }
+  await expect(page.locator('#preview-panel #defect-edit-tools')).toBeVisible();
+  await expect(button).toHaveText('Yeniden analiz et (sıfırla)');
+  expect(requests).toBe(1);
+});
+
+test.describe('touch analysis activation', () => {
+  test.use({
+    hasTouch: true,
+    isMobile: true,
+    viewport: { width: 390, height: 844 },
+  });
+  test('shows the image action without requiring hover', async ({ page }) => {
+    await page.goto('/');
+    await page
+      .locator('#file')
+      .setInputFiles({
+        name: 'touch.png',
+        mimeType: 'image/png',
+        buffer: await sample(),
+      });
+    await settled(page);
+    await page.locator('#go-analyze').tap();
+    await expect(page.locator('.preview-analysis-action')).toHaveCSS(
+      'opacity',
+      '1',
+    );
+    await page.locator('#preview-defects').tap();
+    await expect(
+      page.locator('#preview-panel #defect-edit-tools'),
+    ).toBeVisible();
+    await expect(page.locator('[data-remove]')).toHaveCount(2);
+  });
 });

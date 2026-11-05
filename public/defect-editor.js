@@ -1,6 +1,7 @@
 /* Editable candidate contours. Original masks stay exact until a contour is changed. */
 window.createDefectEditor = function ({
   getReview,
+  hasFile,
   isBusy,
   onChange,
   redraw,
@@ -31,14 +32,15 @@ window.createDefectEditor = function ({
   function sync() {
     const review = getReview();
     document.querySelector('#defect-edit-tools').hidden = !review;
-    document.querySelector('#preview-defects').disabled =
-      isBusy() ||
-      (!document.querySelector('#file').files.length &&
-        !getReview() &&
-        document.querySelector('#active-file').options.length === 0);
-    document.querySelector('#preview-defects').textContent = review
-      ? 'Ön analizi yenile (sıfırla)'
-      : 'Boşluk ön analizi';
+    const activation = document.querySelector('#preview-defects');
+    document.querySelector('.preview-analysis-action').hidden = !hasFile();
+    activation.disabled = isBusy() || !hasFile();
+    activation.textContent =
+      activation.getAttribute('aria-busy') === 'true'
+        ? 'Analiz ediliyor…'
+        : review
+          ? 'Yeniden analiz et (sıfırla)'
+          : 'Analiz et';
     document.querySelector('#undo-defect').disabled =
       isBusy() || !review?.history.length;
     document.querySelector('#reset-defects').disabled =
@@ -318,6 +320,19 @@ window.createDefectEditor = function ({
       target.dataset.vertex === undefined
         ? null
         : Number(target.dataset.vertex);
+    // At low zoom neighboring handle strokes can overlap. Choose the closest
+    // vertex center rather than whichever circle happens to be painted last.
+    if (vertex !== null) {
+      const hit = point(event);
+      vertex = points.reduce(
+        (nearest, p, index) =>
+          Math.hypot(p[0] - hit[0], p[1] - hit[1]) <
+          Math.hypot(points[nearest][0] - hit[0], points[nearest][1] - hit[1])
+            ? index
+            : nearest,
+        vertex,
+      );
+    }
     if (vertex === null && review.selected === id) {
       const edge = nearestEdge(points, point(event));
       const rect = svg.getBoundingClientRect();

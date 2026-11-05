@@ -120,7 +120,7 @@ Bu akış kesit bazında karşılaştırma sağlar; kesitleri birleştirerek 3B 
 4. **Escape** devam eden hareketi iptal eder; **Geri al** son düzenlemeyi, **Düzeltmeleri sıfırla** tüm düzenlemeleri geri alır. Kendi üzerinden geçen veya alanı sıfır olan sınırlar kabul edilmez.
 5. **Ölçümü hesapla** ile düzeltmeleri onaylayın. Aday sayısı, alanı, oranı ve aday ortalamaları düzenlenen maskeden yeniden hesaplanır; Excel'deki işaretli görüntü ve aday bilgileri de güncellenir. Genel numune yoğunluğu istatistikleri aynı ölçüm alanından hesaplanmaya devam eder.
 
-Düzeltmeler dosyaya özeldir ve yalnızca açık sekmede tutulur. Ölçüm alanı dışındaki pikseller aday hesabına alınmaz; çakışan alanlar bir kez sayılır. Düzenlenmeyen adayların özgün piksel maskesi korunur. En büyük 50 aday düzenlenebilir; diğer adaylar toplam ölçümde korunur. Ölçüm alanı, eşik veya kalibrasyon değişirse eski düzeltmeler sıfırlanır; ön analizi yeniden çalıştırın. **Ön analizi yenile (sıfırla)** da mevcut düzeltmeleri temizler.
+Düzeltmeler dosyaya özeldir ve yalnızca açık sekmede tutulur. Ölçüm alanı dışındaki pikseller aday hesabına alınmaz; çakışan alanlar bir kez sayılır. Düzenlenmeyen adayların özgün piksel maskesi korunur. En büyük 50 aday düzenlenebilir; diğer adaylar toplam ölçümde korunur. Ölçüm alanı, eşik veya kalibrasyon değişirse eski düzeltmeler sıfırlanır; ön analizi yeniden çalıştırın. Görsel üzerindeki **Yeniden analiz et (sıfırla)** da mevcut düzeltmeleri temizler.
 
 ### Ölçümün hesaplanma akışı
 
@@ -244,3 +244,11 @@ Genel akış, sentetik farklı şekillerle ve 60 gerçek DICOM ile test edilmiş
 Yükleme, analiz ve rapor sayfaları sırasıyla `#/upload`, `#/analyze`, `#/report` adreslerini kullanır. Ortak `public/router.js` yöneticisi tarayıcının geri/ileri hareketlerini ve doğrudan adres değişikliklerini işler; sunucuda ek route tanımı gerekmez. Yeni bir sayfa için `public/app.js` içindeki `workflowRoutes` listesine `path`, `step`, gerekirse `canEnter` ve `redirect` eklenir; ilgili panel ve gezinme kontrolleri arayüzde tanımlanır.
 
 Route geçişleri dosyaları, ayarları ve sonuçları bellekte korur. Dosyası olmayan analiz adresi yüklemeye, güncel sonucu olmayan rapor adresi analize yönlendirilir. Dosyalar silindiğinde mevcut adres de güncellenir. İşlem veya dosya aktarımı sürerken sayfa geçişi engellenir. Sayfa yenileme ve sekmeyi kapatma kalıcı kayıt sağlamaz; veri yoksa uygun başlangıç sayfası açılır.
+
+### Numune üzerinde yakınlaştırma
+
+Önizlemedeki `+` / `−` düğmeleri görüntüyü büyütüp küçültür; `Görüntüye sığdır` başlangıç görünümüne döner. `Görüntüyü taşı` açıkken büyütülmüş numune fare veya dokunmatik sürüklemeyle gezilebilir; sınır düzenlemek için bu modu kapatın. Yakınlaştırma ölçüm koordinatlarını veya analiz sonucunu değiştirmez.
+
+Ön analizi başlatmak için numune önizlemesinin üzerine gelin ve **Analiz et** düğmesine tıklayın. Fareyle üzerine gelmek tek başına analiz başlatmaz. Düğmeye klavyede Tab ile ulaşılabilir; dokunmatik cihazlarda düğme sürekli görünür. Adayları düzenleme ve geri alma kontrolleri, ön analiz tamamlanınca görselin altında açılır.
+
+Touchpad üzerinde iki parmak açma/kapatma hareketiyle, imlecin olduğu noktaya odaklanarak yakınlaştırıp uzaklaştırabilirsiniz. Ctrl + fare tekerleği de aynı kontrolü kullanır. Normal iki parmak kaydırma büyütülmüş görüntüyü taşır; Safari için yerel gesture olayları da desteklenir. Alan veya sınır noktası sürüklenirken zoom uygulanmaz.
