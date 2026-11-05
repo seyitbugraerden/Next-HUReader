@@ -3831,3 +3831,41 @@ footer {
     transition: none;
   }
 }
+.preview-zoom-tools label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.preview-zoom-tools select {
+  width: auto;
+  max-width: 170px;
+  padding: 6px 28px 6px 8px;
+}
+#tone-levels {
+  width: 54px;
+  padding: 6px;
+}
+.tone-details {
+  padding: 12px 22px;
+  border-bottom: 1px solid #dce6ef;
+}
+.tone-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  font-size: 11px;
+}
+.tone-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.tone-legend i {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  display: inline-block;
+}
+#tone-report {
+  margin-block: 20px;
+}

@@ -39,6 +39,7 @@ for (const mobile of [false, true]) {
     });
     await settled(page);
     await page.locator('#go-analyze').click();
+    await page.locator('#preview-mode').selectOption('defects');
     await page.locator('#viewer').hover();
     await page.locator('#preview-defects').click();
     await expect(page.locator('polygon[data-region]')).toHaveCount(4);
@@ -119,15 +120,14 @@ test('trackpad pinch zooms around the pointer and plain scrolling stays native',
   page,
 }) => {
   await page.goto('/');
-  await page
-    .locator('#file')
-    .setInputFiles({
-      name: 'trackpad.png',
-      mimeType: 'image/png',
-      buffer: await fourVoids(),
-    });
+  await page.locator('#file').setInputFiles({
+    name: 'trackpad.png',
+    mimeType: 'image/png',
+    buffer: await fourVoids(),
+  });
   await settled(page);
   await page.locator('#go-analyze').click();
+  await page.locator('#preview-mode').selectOption('defects');
   await expect(page.locator('#image-canvas')).toBeVisible();
   await page.locator('#zoom-in').click();
   await page.locator('#zoom-in').click();

@@ -29,6 +29,7 @@ test('previews candidates, deletes via x, reshapes freely, and exports only conf
   ]);
   await settled(page);
   await page.locator('#go-analyze').click();
+  await page.locator('#preview-mode').selectOption('defects');
   await page.locator('#viewer').hover();
   await page.locator('#preview-defects').click();
   await expect(page.locator('#defect-edit-tools')).toBeVisible();
@@ -132,6 +133,7 @@ test('supports removing and restoring all candidates on a mobile viewport', asyn
   });
   await settled(page);
   await page.locator('#go-analyze').click();
+  await page.locator('#preview-mode').selectOption('defects');
   await page.locator('#viewer').hover();
   await page.locator('#preview-defects').click();
   await expect(page.locator('[data-remove]')).toHaveCount(2);
@@ -163,15 +165,14 @@ test('image activation supports hover, keyboard and a visible pending analysis',
   const action = page.locator('.preview-analysis-action');
   const button = page.locator('#preview-defects');
   await expect(action).toBeHidden();
-  await page
-    .locator('#file')
-    .setInputFiles({
-      name: 'hover.png',
-      mimeType: 'image/png',
-      buffer: await sample(),
-    });
+  await page.locator('#file').setInputFiles({
+    name: 'hover.png',
+    mimeType: 'image/png',
+    buffer: await sample(),
+  });
   await settled(page);
   await page.locator('#go-analyze').click();
+  await page.locator('#preview-mode').selectOption('defects');
   await page.locator('#image-title').hover();
   await expect(action).toHaveCSS('opacity', '0');
   await page.locator('#viewer').hover();
@@ -214,15 +215,14 @@ test.describe('touch analysis activation', () => {
   });
   test('shows the image action without requiring hover', async ({ page }) => {
     await page.goto('/');
-    await page
-      .locator('#file')
-      .setInputFiles({
-        name: 'touch.png',
-        mimeType: 'image/png',
-        buffer: await sample(),
-      });
+    await page.locator('#file').setInputFiles({
+      name: 'touch.png',
+      mimeType: 'image/png',
+      buffer: await sample(),
+    });
     await settled(page);
     await page.locator('#go-analyze').tap();
+    await page.locator('#preview-mode').selectOption('defects');
     await expect(page.locator('.preview-analysis-action')).toHaveCSS(
       'opacity',
       '1',

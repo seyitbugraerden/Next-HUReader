@@ -32,6 +32,7 @@ test('color, tone and alpha evidence survives preview, analysis and report navig
   });
   await settled(page);
   await page.locator('#go-analyze').click();
+  await page.locator('#preview-mode').selectOption('defects');
   await page.locator('#viewer').hover();
   const previewResponse = page.waitForResponse((response) =>
     response.url().endsWith('/api/defects/preview'),
@@ -79,15 +80,14 @@ test('DICOM preview detects a soft grayscale feature from original HU data', asy
     return Math.round(v) * 4 + 24;
   });
   await page.goto('/');
-  await page
-    .locator('#file')
-    .setInputFiles({
-      name: 'soft-tones.dcm',
-      mimeType: 'application/dicom',
-      buffer: dicomFixture({ width, height: width, pixelValues }),
-    });
+  await page.locator('#file').setInputFiles({
+    name: 'soft-tones.dcm',
+    mimeType: 'application/dicom',
+    buffer: dicomFixture({ width, height: width, pixelValues }),
+  });
   await settled(page);
   await page.locator('#go-analyze').click();
+  await page.locator('#preview-mode').selectOption('defects');
   await expect(page.locator('#image-canvas')).toBeVisible();
   await page.locator('#viewer').hover();
   const response = page.waitForResponse((r) =>

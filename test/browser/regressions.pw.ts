@@ -75,7 +75,7 @@ test('an unreadable file does not stop importing remaining files', async ({
   );
 });
 
-test('late original image cannot replace the calculated grayscale preview', async ({
+test('late original image cannot replace the calculated tonal preview', async ({
   page,
 }) => {
   await page.addInitScript(() => {
@@ -109,10 +109,15 @@ test('late original image cannot replace the calculated grayscale preview', asyn
     .poll(async () =>
       page.locator('#image-canvas').evaluate((canvas: HTMLCanvasElement) => {
         const pixel = canvas.getContext('2d')!.getImageData(60, 60, 1, 1).data;
-        return pixel[0] === pixel[1] && pixel[1] === pixel[2] && pixel[0]! > 0;
+        return pixel[2]! > 0;
       }),
     )
     .toBe(true);
+  const expected = await page
+    .locator('#image-canvas')
+    .evaluate((canvas: HTMLCanvasElement) => [
+      ...canvas.getContext('2d')!.getImageData(60, 60, 1, 1).data,
+    ]);
   // Wait for the deliberately delayed original image callback, not for network readiness.
   await page.waitForTimeout(1000);
   const pixel = await page
@@ -120,8 +125,7 @@ test('late original image cannot replace the calculated grayscale preview', asyn
     .evaluate((canvas: HTMLCanvasElement) => [
       ...canvas.getContext('2d')!.getImageData(60, 60, 1, 1).data,
     ]);
-  expect(pixel[0]).toBe(pixel[1]);
-  expect(pixel[1]).toBe(pixel[2]);
+  expect(pixel).toEqual(expected);
 });
 
 test('ambiguous automatic ROI blocks the report and can recover with manual selection', async ({
@@ -139,13 +143,11 @@ test('ambiguous automatic ROI blocks the report and can recover with manual sele
     .png()
     .toBuffer();
   await page.goto('/');
-  await page
-    .locator('#file')
-    .setInputFiles({
-      name: 'uniform.png',
-      mimeType: 'image/png',
-      buffer: uniform,
-    });
+  await page.locator('#file').setInputFiles({
+    name: 'uniform.png',
+    mimeType: 'image/png',
+    buffer: uniform,
+  });
   await settled(page);
   await page.locator('#go-analyze').click();
   await page.locator('#analyze').click();

@@ -123,6 +123,15 @@ async function createBatchWorkbook(entries) {
         m?.p95 ?? null,
       ]);
     }
+    for (const b of r.toneSegmentation?.bands || []) {
+      sheets.regions.addRow([
+        ...identity,
+        units,
+        `Ton ${b.id} (${b.lower}–${b.upper})`,
+        b.mean,
+        b.pixels,
+      ]);
+    }
     r.regions.forEach((region) =>
       sheets.regions.addRow([
         ...identity,
@@ -137,6 +146,19 @@ async function createBatchWorkbook(entries) {
       Matris: `${r.width} × ${r.height}`,
       'Sayısal değerlendirme': (r.interpretation || []).join(' '),
       'Teknik açıklama': (r.technicalNotes || []).join(' '),
+      ...(r.toneSegmentation
+        ? {
+            'Ton bölgeleme yöntemi': r.toneSegmentation.method,
+            'Ton sınıfları': JSON.stringify(r.toneSegmentation.bands),
+            'Bağlı ton bölgesi sayısı': r.toneSegmentation.count,
+            'Ton bölgeleri (en büyük 200)': JSON.stringify(
+              r.toneSegmentation.regions,
+            ),
+            'Ton bölge listesi sınırlı': r.toneSegmentation.truncated
+              ? 'Evet; sınıf toplamları tüm alanı kapsar'
+              : 'Hayır',
+          }
+        : {}),
       ...(r.defects
         ? {
             'Aday bölge sayısı': r.defects.count,
@@ -206,13 +228,14 @@ async function createBatchWorkbook(entries) {
     canvas.height = r.height;
     const ctx = canvas.getContext('2d');
     ctx.drawImage(image, 0, 0);
-    if (r.defects?.overlay) {
+    const visualOverlay = r.toneSegmentation?.overlay || r.defects?.overlay;
+    if (visualOverlay) {
       const overlay = new Image();
       await new Promise((resolve, reject) => {
         overlay.onload = resolve;
         overlay.onerror = () =>
           reject(new Error('Aday bölge önizlemesi okunamadı.'));
-        overlay.src = r.defects.overlay;
+        overlay.src = visualOverlay;
       });
       ctx.drawImage(overlay, 0, 0);
     }

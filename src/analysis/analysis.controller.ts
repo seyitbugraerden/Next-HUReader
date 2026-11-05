@@ -80,12 +80,18 @@ export class AnalysisController {
     @Body() body: Record<string, unknown>,
     @Res() response: Response,
   ) {
-    const { defects, roi, preview, width, height, unit } = await this.analyze(
-      file,
-      { ...body, defectEdits: undefined },
-    );
+    const { defects, toneSegmentation, roi, preview, width, height, unit } =
+      await this.analyze(file, { ...body, defectEdits: undefined });
     response.setHeader('Cache-Control', 'no-store');
-    return response.json({ defects, roi, preview, width, height, unit });
+    return response.json({
+      defects,
+      toneSegmentation,
+      roi,
+      preview,
+      width,
+      height,
+      unit,
+    });
   }
 
   @Post('analyze')

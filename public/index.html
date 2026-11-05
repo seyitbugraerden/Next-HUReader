@@ -13,6 +13,7 @@
     <script src="/vendor/exceljs.min.js" defer></script>
     <script src="/batch-export.js" defer></script>
     <script src="/preview-viewport.js" defer></script>
+    <script src="/tone-view.js" defer></script>
     <script src="/defect-editor.js" defer></script>
     <script src="/router.js" defer></script>
     <script src="/app.js" defer></script>
@@ -510,9 +511,9 @@
                       checked
                       data-view-only
                     /><span
-                      >Aday bölgeleri göster<small
-                        >Pembe işaretler kesin yarık veya boşluk tanısı
-                        değildir.</small
+                      >Bölge katmanını göster<small
+                        >Ton renkleri yoğunluk sınıflarını, pembe işaretler aday
+                        bölgeleri gösterir.</small
                       ></span
                     ></label
                   >
@@ -699,6 +700,23 @@
                     <button id="zoom-fit" type="button">
                       Görüntüye sığdır
                     </button>
+                    <label
+                      >Görünüm
+                      <select id="preview-mode" data-view-only>
+                        <option value="tones" selected>Ton bölgeleri</option>
+                        <option value="defects">Boşluk adayları</option>
+                      </select></label
+                    >
+                    <label id="tone-levels-control"
+                      >Ton sayısı
+                      <input
+                        name="toneLevels"
+                        id="tone-levels"
+                        type="number"
+                        min="2"
+                        max="8"
+                        value="5"
+                    /></label>
                     <button id="preview-pan" type="button" aria-pressed="false">
                       Görüntüyü taşı
                     </button>
@@ -720,7 +738,7 @@
                         Analiz et
                       </button>
                       <span id="preview-analysis-hint"
-                        >Boşluk adaylarını bul ve düzenle</span
+                        >Açık ve koyu tonları ayrı alanlara böl</span
                       >
                     </div>
                     <div class="viewer" id="viewer">
@@ -761,6 +779,19 @@
                     <span><i class="legend green"></i>Analiz edilen alan</span
                     ><span><i class="legend orange"></i>Numune dış sınırı</span
                     ><span id="dimensions">— × — px</span>
+                  </div>
+                  <div id="tone-preview-details" class="tone-details" hidden>
+                    <p class="quiet">
+                      Renkler koyudan açığa ton sınıflarıdır. Bir bölgeye
+                      tıklayarak ölçümünü görün. Ton sayısını değiştirince
+                      yeniden analiz edin.
+                    </p>
+                    <div id="tone-legend" class="tone-legend"></div>
+                    <p
+                      id="tone-region-readout"
+                      role="status"
+                      aria-live="polite"
+                    ></p>
                   </div>
                   <div id="defect-edit-tools" class="defect-edit-tools" hidden>
                     <label class="check-row"
@@ -917,6 +948,52 @@
                     </table>
                   </div>
                 </div>
+                <section id="tone-report" hidden>
+                  <h3>Açık ve koyu ton bölgeleri</h3>
+                  <p id="tone-summary"></p>
+                  <p class="quiet">
+                    Seçili iç alanın bütün geçerli pikselleri bir ton sınıfına
+                    aittir. Aynı tondaki ayrı parçalar bağlı bölgeler olarak
+                    sayılır. Renkler görsel sınıflardır; malzeme veya yarık
+                    tanısı değildir.
+                  </p>
+                  <div class="table-scroll">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Ton (koyu → açık)</th>
+                          <th>Aralık</th>
+                          <th>Piksel</th>
+                          <th>Alan (mm²)</th>
+                          <th>Oran (%)</th>
+                          <th>Ortalama</th>
+                          <th>Std. sapma</th>
+                        </tr>
+                      </thead>
+                      <tbody id="tone-bands"></tbody>
+                    </table>
+                  </div>
+                  <details>
+                    <summary>Bağlı bölgelerin ölçümleri</summary>
+                    <p id="tone-truncation" class="quiet"></p>
+                    <div class="table-scroll">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Bölge</th>
+                            <th>Ton</th>
+                            <th>Piksel</th>
+                            <th>Alan (mm²)</th>
+                            <th>Ortalama</th>
+                            <th>Min</th>
+                            <th>Maks</th>
+                          </tr>
+                        </thead>
+                        <tbody id="tone-regions"></tbody>
+                      </table>
+                    </div>
+                  </details>
+                </section>
                 <h3>İncelenmesi gereken bölgeler</h3>
                 <p id="defect-summary"></p>
                 <details id="detection-method">

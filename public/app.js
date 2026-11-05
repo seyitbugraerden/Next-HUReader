@@ -29,6 +29,7 @@ let resultDirty = true;
 let entries = [];
 let activeId = null;
 const optionNames = [
+  'toneLevels',
   'roiShape',
   'roiPoints',
   'lowDensityThreshold',
@@ -49,7 +50,13 @@ const previewViewport = window.createPreviewViewport({
   canZoom: () => !selectionDrag && !defectEditor.dragging,
   redraw: () => drawPreview(),
 });
+const toneView = window.createToneView({
+  getView: () =>
+    activeEntry()?.defectReview?.base ?? (!resultDirty ? result : null),
+  redraw: () => drawPreview(),
+});
 const defectEditor = window.createDefectEditor({
+  isEditingMode: () => $('#preview-mode').value === 'defects',
   hasFile: () => !!file,
   getReview: () => activeEntry()?.defectReview,
   isBusy: () => busy || importing,
@@ -80,7 +87,8 @@ function applySettings(settings) {
   $('#manual').checked = settings.manual;
   $('#estimate').checked = settings.estimate;
   for (const key of optionNames)
-    form.elements[key].value = settings.values[key] ?? '';
+    form.elements[key].value =
+      settings.values[key] ?? (key === 'toneLevels' ? '5' : '');
   form.elements.roiShape.value = settings.values.roiShape || 'circle';
   for (const key of ['centerX', 'centerY', 'radius']) {
     form.elements[key].disabled = !settings.manual;
@@ -366,6 +374,9 @@ function syncWorkflow() {
   saveCurrent();
   if (workflowRouter) currentStep = workflowRouter.reconcile().step;
   defectEditor.sync();
+  toneView.sync();
+  $('#tone-levels').disabled = busy || importing;
+  $('#preview-mode').disabled = busy || importing;
   $('#draw-area').hidden = currentStep !== 2 || !activeEntry()?.needsArea;
   $('#draw-area').disabled = busy || importing;
   const hasReady = readyEntries().length > 0;
@@ -511,6 +522,23 @@ $('#draw-area').addEventListener('click', () => {
 });
 
 $('#show-candidates').addEventListener('change', drawPreview);
+$('#preview-mode').addEventListener('change', () => {
+  defectEditor.cancel();
+  $('#tone-levels-control').hidden = $('#preview-mode').value !== 'tones';
+  $('#preview-analysis-hint').textContent =
+    $('#preview-mode').value === 'tones'
+      ? 'Açık ve koyu tonları ayrı alanlara böl'
+      : 'Boşluk adaylarını bul ve düzenle';
+  syncWorkflow();
+  drawPreview();
+});
+$('#tone-levels').addEventListener('input', () => {
+  dirty(true);
+  if (activeEntry()) activeEntry().defectReview = null;
+  syncWorkflow();
+  drawPreview();
+});
+
 function selectedPoints() {
   try {
     return JSON.parse(form.elements.roiPoints.value || '[]');
@@ -580,7 +608,11 @@ $('#estimate').addEventListener('change', () => {
   dirty();
 });
 form.addEventListener('input', (event) => {
-  if (event.target.matches('input:not([type=file]):not([data-view-only])')) {
+  if (
+    event.target.matches(
+      'input:not([type=file]):not([data-view-only]):not([name=toneLevels])',
+    )
+  ) {
     dirty();
     drawPreview();
   }
@@ -846,8 +878,16 @@ function drawPreview() {
   const scale =
     Math.min(screen.width / canvas.width, screen.height / canvas.height) || 1;
   ctx.drawImage(previewImage, 0, 0);
-  const editing = defectEditor.draw(ctx);
-  if (!editing && candidateOverlay && current && $('#show-candidates').checked)
+  defectEditor.sync();
+  const tones = $('#preview-mode').value === 'tones';
+  const editing = tones ? toneView.draw(ctx) : defectEditor.draw(ctx);
+  if (
+    !tones &&
+    !editing &&
+    candidateOverlay &&
+    current &&
+    $('#show-candidates').checked
+  )
     ctx.drawImage(candidateOverlay, 0, 0);
   if (view?.roi.outlines && current && !$('#manual').checked) {
     ctx.lineWidth = Math.max(1, canvas.width / 350);
@@ -1223,7 +1263,7 @@ $('#preview-defects').addEventListener('click', async () => {
   setBusy(true);
   $('#error').hidden = true;
   $('#status').hidden = false;
-  $('#status').textContent = 'Boşluk adayları ön analiz için hazırlanıyor…';
+  $('#status').textContent = 'Ton bölgeleri ve adaylar hazırlanıyor…';
   try {
     const response = await fetch('/api/defects/preview', {
       method: 'POST',
@@ -1243,7 +1283,7 @@ $('#preview-defects').addEventListener('click', async () => {
     $('#edit-defects').checked = true;
     loadPreview(base.preview);
     $('#status').textContent =
-      'Ön analiz hazır. Boşlukları düzenleyin, ardından “Ölçümü hesapla” ile onaylayın. Ön analiz rapora dahil edilmez.';
+      'Ön analiz hazır. Ton bölgelerini inceleyin veya boşluk adayları görünümünde düzenleyin; ardından “Ölçümü hesapla” ile raporu oluşturun.';
   } catch (error) {
     showError(error.message);
     entry.needsArea = error.code === 'ROI_REQUIRED';
@@ -1306,6 +1346,7 @@ form.addEventListener('submit', async (event) => {
   }
 });
 function renderResults(updateCoordinates = true) {
+  toneView.report(result);
   syncWorkflow();
   $('#warning-count').textContent = result.warnings.length;
   $('#results').hidden = false;

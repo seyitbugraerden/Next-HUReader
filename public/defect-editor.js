@@ -1,6 +1,7 @@
 /* Editable candidate contours. Original masks stay exact until a contour is changed. */
 window.createDefectEditor = function ({
   getReview,
+  isEditingMode = () => true,
   hasFile,
   isBusy,
   onChange,
@@ -14,7 +15,8 @@ window.createDefectEditor = function ({
   const resources = new WeakMap();
   let drag = null;
   const clone = (value) => JSON.parse(JSON.stringify(value));
-  const active = () => !!getReview() && toggle.checked && show.checked;
+  const active = () =>
+    isEditingMode() && !!getReview() && toggle.checked && show.checked;
   const editsFor = (review) =>
     new Map(review.edits.map((edit) => [edit.id, edit.points]));
   function pointsFor(review, region) {
@@ -31,7 +33,8 @@ window.createDefectEditor = function ({
   }
   function sync() {
     const review = getReview();
-    document.querySelector('#defect-edit-tools').hidden = !review;
+    document.querySelector('#defect-edit-tools').hidden =
+      !review || !isEditingMode();
     const activation = document.querySelector('#preview-defects');
     document.querySelector('.preview-analysis-action').hidden = !hasFile();
     activation.disabled = isBusy() || !hasFile();

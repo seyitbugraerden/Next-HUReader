@@ -262,3 +262,13 @@ Renk karşılaştırması `255 × R/(R+G+B)` ve `255 × B/(R+G+B)` değerlerinin
 Rapordaki **Tespit nedeni** sütunu koyu ton, yerel ton, renk, saydamlık ve elle düzenleme kaynaklarını gösterir. Kullanılan referanslar API sonucundaki `defects.appearance` ve teknik açıklamalarda; nedenler tekil/toplu Excel'de de tutulur. Kullanıcı yoğunluk eşiğini elle seçerse tarama yalnızca bu eşikle yapılır. DICOM'da genel yoğunluk eşiğine ek olarak yerel HU farkları taranır. Bu tarama özgün HU verisinden yapılır; önizleme penceresi adayları değiştirmez. HU ölçümleri korunur; RGB/alfa sinyalleri DICOM'a eklenmez.
 
 Bunlar keşif amaçlı görsel adaylardır. Renkli işaretler, doğal doku ve saydam kenarlar da aday oluşturabilir; yeni yöntemin gerçek numunelerde doğruluğu, işaretlenmiş referanslarla ayrıca değerlendirilmelidir. Renk/ton/alfa farklarından fiziksel derinlik veya kesin porozite üretilmez.
+
+### Açık ve koyu tonların tamamını bölgeleme
+
+Varsayılan **Ton bölgeleri** görünümü, seçili iç alanın bütün geçerli piksellerini koyudan açığa yoğunluk sınıflarına böler. **Ton sayısı** 2–8 arasında seçilebilir (varsayılan 5); değiştirdikten sonra görsel üzerindeki **Analiz et** ile yeniden hesaplayın. Tekdüze görüntüde veya az sayıda farklı yoğunluk olduğunda gerçek sınıf sayısı daha az olabilir. **Boşluk adayları** görünümü, önceki aday bulma ve sınır düzenleme araçlarını açar. Görünüm değiştirmek ölçümü değiştirmez.
+
+Ton sınıfları özgün yoğunlukların 1 boyutlu k-means gruplamasıdır; hesaplamayı sınırlamak için 1024 kutulu histogram kullanılır. Başlangıç referansları en koyu/en açık değerler ile dağılım yüzdelikleridir. Her piksel bir yoğunluk aralığına atanır; ardından aynı sınıfın 8 komşulukla bağlı parçaları ayrı bölgeler olarak ölçülür. Gürültü nedeniyle piksel atılmaz, açık tonlar da kapsanır. Şeffaf/padding pikselleri ve ölçüm alanı dışı pikseller dahil edilmez. DICOM'da özgün HU, PNG/JPG'de kalibrasyona uygun yoğunluk kullanılır; önizleme rengi ve zoom hesaplamaya katılmaz.
+
+Renk anahtarı her sınıfın gerçek aralığını ve oranını gösterir. Görselde bir bölgeye tıklayarak piksel sayısını, alanını, ortalama/min/maks yoğunluğunu inceleyebilirsiniz. Raporda sınıf toplamları ile bağlı bölge ölçümleri bulunur. En büyük 200 bağlı bölgenin ayrıntısı listelenir; tüm pikseller sınıf toplamlarında ve renkli maskede korunur. Tekil ve toplu Excel'de ton sınıfları, bölge bilgileri ve renkli ton önizlemesi yer alır. Fiziksel piksel boyutu yoksa mm² verilmez.
+
+Ton sınıfı, farklı malzeme veya doğrulanmış yarık anlamına gelmez. Bu işlem tüm seçili alanın yoğunluk bölgelemesidir; belirli numunedeki fiziksel sınır doğruluğu özgün dosya ve referans işaretleme ile ayrıca kontrol edilmelidir.

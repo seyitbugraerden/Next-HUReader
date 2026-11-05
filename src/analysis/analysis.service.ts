@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import sharp from 'sharp';
 import ExcelJS from 'exceljs';
+import { segmentTones } from './tone-segmentation.js';
 import { decodeImage } from './image-decoder.js';
 import { detectCircle, statistics } from './statistics.js';
 import { polygonMembership, validatePolygon } from './roi-geometry.js';
@@ -48,6 +49,20 @@ export function parseOptions(input: Record<string, unknown>): AnalysisOptions {
     result[key] = value;
   }
   const options = result as AnalysisOptions;
+  if (input.toneLevels !== undefined && input.toneLevels !== '') {
+    const value = Number(input.toneLevels);
+    if (
+      !['string', 'number'].includes(typeof input.toneLevels) ||
+      !Number.isInteger(value) ||
+      value < 2 ||
+      value > 8
+    )
+      throw new BadRequestException(
+        'Ton sayısı 2–8 arasında tam sayı olmalıdır.',
+      );
+    options.toneLevels = value;
+  }
+
   if (input.defectEdits !== undefined && input.defectEdits !== '') {
     try {
       const edits: unknown =
@@ -550,6 +565,43 @@ export class AnalysisService {
       labelMap: `data:image/png;base64,${labelPng.toString('base64')}`,
       overlay: `data:image/png;base64,${defectPng.toString('base64')}`,
     };
+    const {
+      bandMap,
+      labels: toneLabels,
+      ...toneData
+    } = segmentTones(image, innerMask, options.toneLevels ?? 5);
+    rgba.fill(0);
+    for (let i = 0; i < bandMap.length; i++) {
+      if (bandMap[i]) {
+        const color = toneData.bands[bandMap[i]! - 1]!.color;
+        rgba[i * 4] = color[0];
+        rgba[i * 4 + 1] = color[1];
+        rgba[i * 4 + 2] = color[2];
+        rgba[i * 4 + 3] = 175;
+      }
+      const id = toneLabels[i]!;
+      labelBytes[i * 3] = id & 255;
+      labelBytes[i * 3 + 1] = (id >>> 8) & 255;
+      labelBytes[i * 3 + 2] = (id >>> 16) & 255;
+    }
+    const toneOverlay = await sharp(rgba, {
+      raw: { width, height, channels: 4 },
+    })
+      .png()
+      .toBuffer();
+    const toneLabelPng = await sharp(labelBytes, {
+      raw: { width, height, channels: 3 },
+    })
+      .png()
+      .toBuffer();
+    const toneSegmentation = {
+      ...toneData,
+      overlay: `data:image/png;base64,${toneOverlay.toString('base64')}`,
+      labelMap: `data:image/png;base64,${toneLabelPng.toString('base64')}`,
+    };
+    interpretation.push(
+      `Seçili iç alanın tamamı ${toneSegmentation.bands.length} ton sınıfına ve ${toneSegmentation.count} bağlı bölgeye ayrıldı. Renkler koyudan açığa yoğunluk sınıflarını gösterir; yarık veya malzeme türü tanısı değildir.`,
+    );
     interpretation.push(
       `${defects.count} ${defects.manuallyEdited ? 'elle düzenlenmiş' : defects.appearance ? 'görsel farklılık içeren' : 'düşük yoğunluklu'} aday bölge bulundu; ${defects.elongatedCount} tanesi ince/uzamış geometri ölçütünü karşılıyor. Bu bölgeler yarık, boşluk, malzeme dokusu veya görüntüleme etkisi olabilir; doğrulanmış yarık sayısı değildir.`,
     );
@@ -650,6 +702,7 @@ export class AnalysisService {
       ...(parts ? { parts } : {}),
       technicalNotes,
       defects,
+      toneSegmentation,
       ...(materialReference ? { materialReference } : {}),
       ...(lowDensity ? { lowDensity } : {}),
       regions,
@@ -740,6 +793,65 @@ export class AnalysisService {
         'Not',
         'En büyük 50 aday listelendi; toplamlar bütün adayları kapsar.',
       ]);
+    if (result.toneSegmentation) {
+      sheet.addRow([]);
+      sheet.addRow([
+        'Ton sınıfı',
+        'Alt sınır',
+        'Üst sınır',
+        'Piksel',
+        'Alan (mm²)',
+        'Oran (%)',
+        'Ortalama',
+        'Std. sapma',
+        'Min',
+        'Maks',
+        'Renk (RGB)',
+      ]);
+      for (const b of result.toneSegmentation.bands)
+        sheet.addRow([
+          b.id,
+          b.lower,
+          b.upper,
+          b.pixels,
+          b.area,
+          b.percent,
+          b.mean,
+          b.std,
+          b.min,
+          b.max,
+          b.color.join(', '),
+        ]);
+      sheet.addRow([]);
+      sheet.addRow([
+        'Ton bölgesi',
+        'Ton sınıfı',
+        'Piksel',
+        'Alan (mm²)',
+        'Oran (%)',
+        'Ortalama',
+        'Std. sapma',
+        'Min',
+        'Maks',
+      ]);
+      for (const r of result.toneSegmentation.regions)
+        sheet.addRow([
+          r.id,
+          r.band,
+          r.pixels,
+          r.area,
+          r.percent,
+          r.mean,
+          r.std,
+          r.min,
+          r.max,
+        ]);
+      if (result.toneSegmentation.truncated)
+        sheet.addRow([
+          'Not',
+          'En büyük 200 bağlı bölge listelendi; ton sınıfı toplamları bütün geçerli alanı kapsar.',
+        ]);
+    }
     if (result.parts) {
       sheet.addRow([]);
       sheet.addRow([
@@ -810,7 +922,7 @@ export class AnalysisService {
     }
     roi.addRow([
       'Not',
-      'Yeşil: ölçüm alanı; turuncu: numune sınırı; pembe: doğrulanmamış düşük yoğunluk adayları.',
+      'Yeşil: ölçüm alanı; turuncu: numune sınırı; renkli dolgu: koyudan açığa ton sınıfları. Renk ve aralık anahtarı CT Sayıları tablosundadır.',
     ]);
     const polygons =
       result.roi.outlines ??
@@ -822,11 +934,13 @@ export class AnalysisService {
       Buffer.from(result.preview.split(',')[1]!, 'base64'),
     )
       .composite([
-        ...(result.defects
+        ...((result.toneSegmentation ?? result.defects)
           ? [
               {
                 input: Buffer.from(
-                  result.defects.overlay.split(',')[1]!,
+                  (result.toneSegmentation ?? result.defects)!.overlay.split(
+                    ',',
+                  )[1]!,
                   'base64',
                 ),
               },

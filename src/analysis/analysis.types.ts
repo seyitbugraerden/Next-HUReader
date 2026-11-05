@@ -1,9 +1,11 @@
+import type { ToneSegmentation } from './tone-segmentation.js';
 export interface DefectEdit {
   id: number;
   points: [number, number][] | null;
 }
 
 export interface AnalysisOptions {
+  toneLevels?: number;
   defectEdits?: DefectEdit[];
   roiShape?: 'circle' | 'rectangle' | 'polygon';
   roiPoints?: [number, number][];
@@ -79,6 +81,7 @@ export interface AnalysisResult {
   parts?: { index: number; measurements: Statistics | null }[];
   lowDensity?: { threshold: number; count: number; percent: number };
   defects?: DefectCandidates;
+  toneSegmentation?: ToneSegmentation;
   materialReference?: {
     name: string;
     source: string;
