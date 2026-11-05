@@ -47,7 +47,7 @@ window.createDefectEditor = function ({
       isBusy() || !review?.edits.length;
     toggle.disabled = isBusy();
     document.querySelector('#defect-edit-status').textContent = review
-      ? `${review.base.defects.count} aday tespit edildi · ${review.edits.length} aday düzenlendi.${review.base.defects.truncated ? ' En büyük 50 aday düzenlenebilir; diğer adaylar korunur.' : ''}${review.base.defects.regions.some((region) => region.outlineApproximate) ? ' Karmaşık sınırlar kutu taslağıyla gösterilir; düzenlenene kadar özgün piksel maskeleri korunur.' : ''}`
+      ? `${review.base.defects.count} aday tespit edildi · ${review.edits.length} aday düzenlendi.${review.base.defects.appearance ? (review.base.defects.appearance.mode === 'tone' ? ' Özgün yoğunlukta yerel ton farkları tarandı.' : ' Renk, ton ve saydamlık farkları tarandı.') : ''}${review.base.defects.truncated ? ' En büyük 50 aday düzenlenebilir; diğer adaylar korunur.' : ''}${review.base.defects.regions.some((region) => region.outlineApproximate) ? ' Karmaşık sınırlar kutu taslağıyla gösterilir; düzenlenene kadar özgün piksel maskeleri korunur.' : ''}`
       : '';
     svg.toggleAttribute('hidden', !active());
     if (!active()) svg.replaceChildren();

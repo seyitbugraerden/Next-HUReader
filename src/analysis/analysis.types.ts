@@ -29,6 +29,7 @@ export interface ImageData {
   values: Float64Array;
   display: Uint8Array;
   valid: Uint8Array;
+  rgba?: Uint8Array;
   unit: 'HU' | 'gray' | 'estimated-HU';
   spacing: [number, number] | null;
   metadata: Record<string, string | number>;
@@ -86,10 +87,24 @@ export interface AnalysisResult {
   };
 }
 
+export type CandidateSignal =
+  'intensity' | 'local-contrast' | 'color' | 'alpha' | 'manual';
+export interface AppearanceReference {
+  mode: 'tone' | 'color-tone-alpha';
+  localRadii: number[];
+  localNoise: number;
+  color?: [number, number];
+  colorThresholds?: [number, number];
+  alpha?: number;
+  alphaThreshold?: number;
+  localRadius: number;
+  localContrastFloor: number;
+}
 export interface DefectRegion {
   id: number;
   outline: [number, number][];
   outlineApproximate?: boolean;
+  signals?: CandidateSignal[];
   pixels: number;
   area: number | null;
   mean: number;
@@ -100,6 +115,7 @@ export interface DefectRegion {
   touchesBoundary: boolean;
 }
 export interface DefectCandidates {
+  appearance?: AppearanceReference;
   labelMap: string;
   manuallyEdited: boolean;
   threshold: number;

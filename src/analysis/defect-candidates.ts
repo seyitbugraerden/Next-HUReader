@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { polygonMembership, validatePolygon } from './roi-geometry.js';
+import { appearanceSignals } from './appearance-signals.js';
 import { contour } from './sample-segmentation.js';
 import type { DefectEdit, DefectRegion, ImageData } from './analysis.types.js';
 
@@ -22,11 +23,25 @@ export function findDefectCandidates(
     .sort((a, b) => a - b);
   const threshold =
     suppliedThreshold ?? median - Math.max(1, 3 * 1.4826 * middle(deviations));
-  const automatic = measureCandidates(image, roi, sorted.length, threshold);
+  const { signals, appearance } = appearanceSignals(
+    image,
+    roi,
+    threshold,
+    suppliedThreshold === undefined,
+  );
+  const automatic = measureCandidates(
+    image,
+    roi,
+    sorted.length,
+    threshold,
+    signals,
+  );
+  const details = appearance ? { appearance } : {};
   if (!edits.length) {
     const result = automatic;
     return {
       ...result,
+      ...details,
       thresholdSource:
         suppliedThreshold === undefined
           ? ('robust' as const)
@@ -35,6 +50,7 @@ export function findDefectCandidates(
     };
   }
   const mask = automatic.mask.slice();
+  const editedSignals = signals.slice();
   const editedIds = new Set(edits.map((edit) => edit.id));
   for (const edit of edits) {
     if (edit.id > automatic.count)
@@ -68,13 +84,27 @@ export function findDefectCandidates(
     for (let y = minY; y <= maxY; y++)
       for (let x = minX; x <= maxX; x++) {
         const index = y * image.width + x;
-        if (roi[index] && polygonMembership(edit.points, x, y, 0).full)
+        if (
+          roi[index] &&
+          image.valid[index] &&
+          polygonMembership(edit.points, x, y, 0).full
+        ) {
           mask[index] = 1;
+          editedSignals[index]! |= 16;
+        }
       }
   }
-  const result = measureCandidates(image, roi, sorted.length, threshold, mask);
+  const result = measureCandidates(
+    image,
+    roi,
+    sorted.length,
+    threshold,
+    editedSignals,
+    mask,
+  );
   return {
     ...result,
+    ...details,
     thresholdSource:
       suppliedThreshold === undefined ? ('robust' as const) : ('user' as const),
     manuallyEdited: true,
@@ -86,6 +116,7 @@ function measureCandidates(
   roi: Uint8Array,
   sampleCount: number,
   threshold: number,
+  signals: Uint8Array,
   suppliedMask?: Uint8Array,
 ) {
   const { width, height, values, spacing } = image;
@@ -99,7 +130,11 @@ function measureCandidates(
     boundaryCount = 0;
   const regions: DefectRegion[] = [];
   for (let i = 0; i < roi.length; i++)
-    if (roi[i] && (suppliedMask ? suppliedMask[i] : values[i]! <= threshold))
+    if (
+      roi[i] &&
+      image.valid[i] &&
+      (suppliedMask ? suppliedMask[i] : signals[i])
+    )
       state[i] = 1;
   for (let start = 0; start < state.length; start++) {
     if (state[start] !== 1) continue;
@@ -115,7 +150,8 @@ function measureCandidates(
       sxx = 0,
       syy = 0,
       sxy = 0,
-      touchesBoundary = false;
+      touchesBoundary = false,
+      signalBits = 0;
     queue[0] = start;
     state[start] = 2;
     while (head < tail) {
@@ -129,6 +165,7 @@ function measureCandidates(
       const px = x * (spacing?.[0] ?? 1),
         py = y * (spacing?.[1] ?? 1);
       sum += values[index]!;
+      signalBits |= signals[index]!;
       sx += px;
       sy += py;
       sxx += px * px;
@@ -176,6 +213,9 @@ function measureCandidates(
     }
     regions.push({
       id: total,
+      signals: (
+        ['intensity', 'local-contrast', 'color', 'alpha', 'manual'] as const
+      ).filter((_, index) => signalBits & (1 << index)),
       outline: [],
       pixels: tail,
       area: spacing ? tail * spacing[0] * spacing[1] : null,

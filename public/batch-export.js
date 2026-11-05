@@ -139,7 +139,7 @@ async function createBatchWorkbook(entries) {
       'Teknik açıklama': (r.technicalNotes || []).join(' '),
       ...(r.defects
         ? {
-            'Düşük yoğunluk adayı sayısı': r.defects.count,
+            'Aday bölge sayısı': r.defects.count,
             'İnce/uzamış aday sayısı': r.defects.elongatedCount,
             'Aday alan oranı (%)': r.defects.percent,
             'Aday tarama eşiği': r.defects.threshold,
@@ -148,6 +148,13 @@ async function createBatchWorkbook(entries) {
                 ? 'Kullanıcı'
                 : 'Otomatik öneri',
             'Aday bölgeler (en büyük 50)': JSON.stringify(r.defects.regions),
+            ...(r.defects.appearance
+              ? {
+                  'Görsel tarama referansı': JSON.stringify(
+                    r.defects.appearance,
+                  ),
+                }
+              : {}),
           }
         : {}),
       'Piksel boyutu X (mm)': r.spacing?.[0] ?? 'Belirtilmedi',

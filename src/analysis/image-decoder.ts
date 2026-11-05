@@ -31,13 +31,22 @@ export async function decodeImage(
   }
   checkImageDimensions(metadata.width ?? 0, metadata.height ?? 0, limit);
   let raw;
+  let rgba;
   try {
     raw = await sharp(buffer, {
       limitInputPixels: limit || false,
       animated: false,
     })
       .autoOrient()
-      .flatten({ background: '#000000' })
+      .toColourspace('srgb')
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    rgba = raw.data;
+    raw = await sharp(rgba, {
+      raw: { width: raw.info.width, height: raw.info.height, channels: 4 },
+    })
+      .removeAlpha()
       .greyscale()
       .raw()
       .toBuffer({ resolveWithObject: true });
@@ -53,19 +62,38 @@ export async function decodeImage(
         (v / 255) * (options.windowMax! - options.windowMin!)
       : v,
   );
+  const valid = new Uint8Array(values.length);
+  const display = Uint8Array.from(raw.data);
+  let transparent = 0,
+    partial = 0;
+  for (let i = 0; i < values.length; i++) {
+    const alpha = rgba[i * 4 + 3]!;
+    valid[i] = alpha > 0 ? 1 : 0;
+    if (!alpha) {
+      transparent++;
+      display[i] = 0;
+    } else if (alpha < 255) partial++;
+  }
+  if (transparent === values.length)
+    throw new BadRequestException(
+      'Görüntü tamamen şeffaf; ölçülebilecek piksel bulunamadı.',
+    );
   return {
     width: raw.info.width,
     height: raw.info.height,
     values,
-    display: Uint8Array.from(raw.data),
-    valid: new Uint8Array(values.length).fill(1),
+    display,
+    valid,
+    rgba,
     unit: estimated ? 'estimated-HU' : 'gray',
     spacing:
       options.spacingX !== undefined
         ? [options.spacingX, options.spacingY!]
         : null,
     metadata: {
-      Kaynak: 'PNG/JPG (8 bit gri tonlama)',
+      Kaynak: 'PNG/JPG (sRGB renk, gri ton ve alfa)',
+      'Şeffaf piksel (ölçüm dışı)': transparent,
+      'Kısmen saydam piksel': partial,
       ...(estimated
         ? {
             'Pencere alt sınırı': options.windowMin!,
@@ -74,6 +102,11 @@ export async function decodeImage(
         : {}),
     },
     warnings: [
+      ...(transparent || partial
+        ? [
+            'Tam şeffaf pikseller ölçümden dışlandı. Kısmi saydamlık yoğunluğu koyulaştırmaz; alfa farkı ayrı bir görsel aday sinyalidir, fiziksel yoğunluk veya derinlik değildir.',
+          ]
+        : []),
       estimated
         ? 'HU değerleri belirtilen pencere aralığından yaklaşık hesaplandı. Kırpılmış tonlar, çizimler ve görüntü işleme ölçümleri etkiler; özgün DICOM ölçümü değildir.'
         : 'Bu görüntüde HU kalibrasyonu yoktur. Sonuçlar 0–255 gri ton yoğunluğudur.',

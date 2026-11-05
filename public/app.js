@@ -341,6 +341,15 @@ const fmt = (value, decimals = 1) =>
         maximumFractionDigits: decimals,
         minimumFractionDigits: decimals,
       }).format(value);
+const signalLabels = {
+  intensity: 'Koyu ton',
+  'local-contrast': 'Yerel ton farkı',
+  color: 'Renk farkı',
+  alpha: 'Saydamlık farkı',
+  manual: 'Elle düzenlendi',
+};
+const signalText = (signals) =>
+  (signals || []).map((signal) => signalLabels[signal] || signal).join(', ');
 const integer = (value) => fmt(value, 0);
 const unitLabel = (unit) =>
   unit === 'HU'
@@ -1346,7 +1355,7 @@ function renderResults(updateCoordinates = true) {
     ? `${defects.count} aday bölge; ${defects.elongatedCount} ince/uzamış aday. İşaretli alan oranı %${fmt(defects.percent, 2)}.${defects.manuallyEdited ? ' Kullanıcının boşluk düzeltmeleri uygulanmıştır.' : ''}${defects.truncated ? ' En büyük 50 bölge listeleniyor; toplamlar tüm adayları kapsar.' : ''}`
     : 'Bu sonuç için aday bölge taraması bulunmuyor.';
   $('#defect-settings').textContent = defects
-    ? `Tarama eşiği: ${fmt(defects.threshold, 2)} ${unitLabel(result.unit)} (${defects.thresholdSource === 'user' ? 'elle seçilmiş' : 'otomatik'}).`
+    ? `Yoğunluk eşiği: ${fmt(defects.threshold, 2)} ${unitLabel(result.unit)} (${defects.thresholdSource === 'user' ? 'elle seçilmiş' : 'otomatik'}).${defects.appearance ? (defects.appearance.mode === 'tone' ? ' Özgün yoğunlukta yerel ton farkları da tarandı.' : ' Renk, yerel ton ve saydamlık farkları da tarandı.') : ''}`
     : '';
   $('#technical-notes').replaceChildren(
     ...(result.technicalNotes || []).map((text) => {
@@ -1360,7 +1369,7 @@ function renderResults(updateCoordinates = true) {
       const row = document.createElement('tr');
       for (const value of [
         index + 1,
-        region.elongated ? 'İnce/uzamış aday' : 'Düşük yoğunluk adayı',
+        region.elongated ? 'İnce/uzamış aday' : 'Aday bölge',
         integer(region.pixels),
         fmt(region.area, 2),
         fmt(region.mean),
@@ -1369,6 +1378,7 @@ function renderResults(updateCoordinates = true) {
           ? '—'
           : `${fmt(region.widthMm, 2)} × ${fmt(region.heightMm, 2)}`,
         region.touchesBoundary ? 'Evet; sınırı kontrol edin' : 'Hayır',
+        signalText(region.signals),
       ]) {
         const cell = document.createElement('td');
         cell.textContent = value;

@@ -1,6 +1,9 @@
 // Minimal uncompressed Explicit VR Little Endian CT fixture, generated in memory.
 export function dicomFixture(
   options: {
+    width?: number;
+    height?: number;
+    pixelValues?: number[];
     signed?: boolean;
     padding?: boolean;
     compressed?: boolean;
@@ -35,8 +38,17 @@ export function dicomFixture(
     else b.writeUInt16LE(v);
     return element(g, t, signed ? 'SS' : 'US', b);
   };
-  const pixels = Buffer.alloc(8 * 8 * 2);
-  for (let i = 0; i < 64; i++) {
+  const width = options.width ?? 8,
+    height = options.height ?? 8;
+  const pixels = Buffer.alloc(width * height * 2);
+  if (options.pixelValues && options.pixelValues.length !== width * height)
+    throw new Error('Fixture pixel dimensions do not match');
+  for (let i = 0; i < width * height; i++) {
+    if (options.pixelValues) {
+      if (options.signed) pixels.writeInt16LE(options.pixelValues[i]!, i * 2);
+      else pixels.writeUInt16LE(options.pixelValues[i]!, i * 2);
+      continue;
+    }
     if (options.signed)
       pixels.writeInt16LE(i === 0 && options.padding ? -2000 : -100, i * 2);
     else pixels.writeUInt16LE(i === 0 && options.padding ? 0 : 1000, i * 2);
@@ -55,8 +67,8 @@ export function dicomFixture(
     number(0x28, 2, 1),
     text(0x28, 4, 'CS', 'MONOCHROME2'),
     text(0x28, 8, 'IS', options.frames ?? '1'),
-    number(0x28, 0x10, 8),
-    number(0x28, 0x11, 8),
+    number(0x28, 0x10, height),
+    number(0x28, 0x11, width),
     text(0x28, 0x30, 'DS', '0.5\\0.25'),
     number(0x28, 0x100, 16),
     number(0x28, 0x101, 16),

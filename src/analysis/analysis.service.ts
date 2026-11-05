@@ -13,7 +13,16 @@ import type {
   AnalysisOptions,
   AnalysisResult,
   Circle,
+  CandidateSignal,
 } from './analysis.types.js';
+
+const candidateSignalLabels: Record<CandidateSignal, string> = {
+  intensity: 'Koyu ton',
+  'local-contrast': 'Yerel ton farkı',
+  color: 'Renk farkı',
+  alpha: 'Saydamlık farkı',
+  manual: 'Elle düzenlendi',
+};
 
 export function parseOptions(input: Record<string, unknown>): AnalysisOptions {
   const result: Record<string, number> = {};
@@ -160,8 +169,12 @@ export function parseOptions(input: Record<string, unknown>): AnalysisOptions {
 export class AnalysisService {
   async preview(buffer: Buffer) {
     const image = await decodeImage(buffer, {});
-    const png = await sharp(Buffer.from(image.display), {
-      raw: { width: image.width, height: image.height, channels: 1 },
+    const png = await sharp(Buffer.from(image.rgba ?? image.display), {
+      raw: {
+        width: image.width,
+        height: image.height,
+        channels: image.rgba ? 4 : 1,
+      },
     })
       .png()
       .toBuffer();
@@ -213,6 +226,21 @@ export class AnalysisService {
       }
       validatePolygon(points ?? [], width, height);
     }
+    // Transparency defines visibility, independently of the RGB under it.
+    // Use this silhouette only for ROI proposals; measurements use original pixels.
+    const silhouette =
+      shape === 'circle' &&
+      options.radius === undefined &&
+      image.rgba &&
+      image.metadata['Şeffaf piksel (ölçüm dışı)']
+        ? {
+            ...image,
+            display: Uint8Array.from(valid, (v) => (v ? 255 : 0)),
+            valid: new Uint8Array(valid.length).fill(1),
+          }
+        : image;
+    if (silhouette !== image)
+      image.metadata['Otomatik sınır referansı'] = 'Alfa görünürlük maskesi';
     let circle: Circle;
     if (shape !== 'circle') {
       const xs = points!.map((p) => p[0]),
@@ -229,14 +257,14 @@ export class AnalysisService {
         radius: options.radius,
       };
     else {
-      const detected = detectCircle(image);
+      const detected = detectCircle(silhouette);
       if (detected) {
         circle = detected;
         image.warnings.push(
           'Otomatik çember bir öneridir. Ölçüm alanını görüntü üzerinde kontrol edin; gerekiyorsa düzeltin.',
         );
       } else {
-        segmentation = detectSampleAreas(image) ?? undefined;
+        segmentation = detectSampleAreas(silhouette) ?? undefined;
         outlines = segmentation?.outlines;
         if (!outlines)
           throw new BadRequestException({
@@ -403,8 +431,8 @@ export class AnalysisService {
       histogram[Math.floor((v - lower) / binSize)]!.count++;
     for (const bin of histogram)
       bin.percent = (bin.count / sample.length) * 100;
-    const png = await sharp(Buffer.from(image.display), {
-      raw: { width, height, channels: 1 },
+    const png = await sharp(Buffer.from(image.rgba ?? image.display), {
+      raw: { width, height, channels: image.rgba ? 4 : 1 },
     })
       .png()
       .toBuffer();
@@ -523,7 +551,7 @@ export class AnalysisService {
       overlay: `data:image/png;base64,${defectPng.toString('base64')}`,
     };
     interpretation.push(
-      `${defects.count} ${defects.manuallyEdited ? 'elle düzenlenmiş' : 'düşük yoğunluklu'} aday bölge bulundu; ${defects.elongatedCount} tanesi ince/uzamış geometri ölçütünü karşılıyor. Bu bölgeler yarık, boşluk, malzeme dokusu veya görüntüleme etkisi olabilir; doğrulanmış yarık sayısı değildir.`,
+      `${defects.count} ${defects.manuallyEdited ? 'elle düzenlenmiş' : defects.appearance ? 'görsel farklılık içeren' : 'düşük yoğunluklu'} aday bölge bulundu; ${defects.elongatedCount} tanesi ince/uzamış geometri ölçütünü karşılıyor. Bu bölgeler yarık, boşluk, malzeme dokusu veya görüntüleme etkisi olabilir; doğrulanmış yarık sayısı değildir.`,
     );
     interpretation.push(
       `Aday bölgelerin piksel alanı oranı %${format(defects.percent)}. ${defects.boundaryCount} bölge ölçüm sınırına temas ediyor; numune dışı alan veya kırpılmış yapı etkisi kontrol edilmelidir.`,
@@ -533,6 +561,24 @@ export class AnalysisService {
         ? `Aday tarama eşiği kullanıcı tarafından ${format(defects.threshold)} ${unit} olarak seçildi.`
         : `Aday tarama eşiği bu görüntünün medyan ve mutlak sapmasından ${format(defects.threshold)} ${unit} olarak otomatik önerildi; malzeme için kalibre edilmiş kabul eşiği değildir.`,
     ];
+    if (defects.appearance) {
+      const a = defects.appearance;
+      technicalNotes.push(
+        `Yerel ton taraması ${a.localRadii.map((r) => `${2 * r + 1} × ${2 * r + 1}`).join(', ') || 'uygun komşuluk yok'} ölçeklerinde çalışır. Hedef bölge çevre halkasıyla karşılaştırılır; ton farkı eşiği ${format(a.localContrastFloor)} ${unit}, komşu piksel farklarından gürültü tahmini ${format(a.localNoise)} ${unit}. Halkadaki doğrusal aydınlık eğilimi çıkarılır; kalan sapmanın iki katı yerel eşiği artırabilir. Eksik çevre halkaları değerlendirilmez.`,
+      );
+      if (a.mode === 'color-tone-alpha')
+        technicalNotes.push(
+          `PNG/JPG'de normalize renk ve alfa farkları da taranır. Renk eşikleri: ${a.colorThresholds?.map((v) => format(v)).join(' / ')}; alfa referansı/eşiği: ${a.alpha} / ${format(a.alphaThreshold!)} (0–255).`,
+          'Renk ve alfa farkları fiziksel boşluk, yoğunluk veya derinlik ölçümü değildir. Şeffaf pikseller dışlanır; kısmen saydam piksellerin özgün renk/ton değerleri ölçülür.',
+        );
+      else
+        technicalNotes.push(
+          'DICOM yerel ton karşılaştırması özgün HU değerleriyle yapılır; önizleme penceresi veya RGB renk oranları kullanılmaz.',
+        );
+      technicalNotes.push(
+        'Genel yoğunluk istatistikleri ve HU dönüşümü görsel aday sinyallerinden bağımsızdır. Yerel koyulaşmalar doku veya görüntüleme etkisi de olabilir; fiziksel yarık/derinlik olarak doğrulanmamıştır.',
+      );
+    }
     if (defects.manuallyEdited)
       technicalNotes.push(
         'Boşluk adayları kullanıcı tarafından silindi veya serbest çokgen ile düzenlendi. Aday istatistikleri düzenlenen birleşik maskeden hesaplandı; genel yoğunluk ölçümleri değiştirilmedi. Ölçüm alanı dışındaki pikseller aday hesabına alınmadı.',
@@ -671,6 +717,7 @@ export class AnalysisService {
       'Kutu yüksekliği (mm)',
       'İnce/uzamış aday',
       'Sınıra temas',
+      'Tespit nedenleri',
     ]);
     for (const [i, region] of (result.defects?.regions ?? []).entries())
       sheet.addRow([
@@ -684,6 +731,9 @@ export class AnalysisService {
         region.heightMm,
         region.elongated ? 'Evet' : 'Hayır',
         region.touchesBoundary ? 'Evet' : 'Hayır',
+        (region.signals ?? [])
+          .map((signal) => candidateSignalLabels[signal])
+          .join(', '),
       ]);
     if (result.defects?.truncated)
       sheet.addRow([

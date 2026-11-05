@@ -510,7 +510,7 @@
                       checked
                       data-view-only
                     /><span
-                      >Düşük yoğunluk adaylarını göster<small
+                      >Aday bölgeleri göster<small
                         >Pembe işaretler kesin yarık veya boşluk tanısı
                         değildir.</small
                       ></span
@@ -925,11 +925,12 @@
                   <div id="technical-notes"></div>
                   <p class="quiet">
                     Tarama yalnızca seçili iç alanı kapsar. 8 komşulukla bağlı,
-                    en az 3 piksellik koyu bölgeler listelenir. “İnce/uzamış”
-                    bir şekil ölçütüdür; yarık doğrulaması değildir. Eşik
-                    otomatik öneriyse medyan − 3 × 1,4826 × MAD kullanılır (en
-                    az 1 birim fark). Sonuçların gerçek yarıklarla eşleşmesi
-                    henüz doğrulanmamıştır.
+                    en az 3 piksellik aday bölgeler listelenir. PNG/JPG’de renk,
+                    yerel ton ve saydamlık farkları da değerlendirilir.
+                    “İnce/uzamış” bir şekil ölçütüdür; yarık doğrulaması
+                    değildir. Eşik otomatik öneriyse medyan − 3 × 1,4826 × MAD
+                    kullanılır (en az 1 birim fark). Sonuçların gerçek
+                    yarıklarla eşleşmesi henüz doğrulanmamıştır.
                   </p>
                 </details>
                 <div class="table-scroll">
@@ -944,6 +945,7 @@
                         <th>Kutu (px)</th>
                         <th>Kutu (mm)</th>
                         <th>Sınıra temas</th>
+                        <th>Tespit nedeni</th>
                       </tr>
                     </thead>
                     <tbody id="defect-regions"></tbody>
